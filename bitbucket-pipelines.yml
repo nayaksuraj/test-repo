@@ -1,92 +1,287 @@
+# ==============================================================================
+# REUSABLE BITBUCKET PIPELINE CONFIGURATION
+# ==============================================================================
+# This pipeline is designed to be reusable across multiple projects
+# Simply copy this file and customize the variables below for your project
+# ==============================================================================
+
+# Default Docker image - Override this for your project needs
 image: maven:3.8.6-openjdk-17
+
+# ==============================================================================
+# CONFIGURATION VARIABLES (Customize these in Repository Variables)
+# ==============================================================================
+# Set these in: Repository Settings > Pipelines > Repository Variables
+#
+# BUILD_COMMAND: Command to build the project (default: mvn clean compile)
+# TEST_COMMAND: Command to run tests (default: mvn test)
+# PACKAGE_COMMAND: Command to package the app (default: mvn package -DskipTests)
+# QUALITY_COMMAND: Command for code quality (default: mvn verify -DskipTests)
+# ARTIFACT_PATH: Path to build artifacts (default: target/*.jar)
+# DEPLOY_STAGING_SCRIPT: Custom staging deployment script
+# DEPLOY_PRODUCTION_SCRIPT: Custom production deployment script
+# ==============================================================================
 
 definitions:
   caches:
     maven-local: ~/.m2/repository
+    gradle: ~/.gradle
+    npm: $HOME/.npm
+    node: node_modules
 
   steps:
+    # ==========================================================================
+    # BUILD AND TEST STEP - Works with any build tool
+    # ==========================================================================
     - step: &build-and-test
         name: Build and Test
         caches:
           - maven
           - maven-local
+          - gradle
+          - npm
+          - node
         script:
-          - echo "Building Spring Boot application..."
-          - mvn clean compile
-          - echo "Running tests..."
-          - mvn test
-          - echo "Packaging application..."
-          - mvn package -DskipTests
-        artifacts:
-          - target/*.jar
+          - echo "=== Starting Build and Test ==="
+          - echo "Project: $BITBUCKET_REPO_SLUG"
+          - echo "Branch: $BITBUCKET_BRANCH"
+          - echo "Commit: $BITBUCKET_COMMIT"
 
+          # Build step - Uses BUILD_COMMAND variable or default
+          - echo "Building application..."
+          - ${BUILD_COMMAND:-mvn clean compile}
+
+          # Test step - Uses TEST_COMMAND variable or default
+          - echo "Running tests..."
+          - ${TEST_COMMAND:-mvn test}
+
+          # Package step - Uses PACKAGE_COMMAND variable or default
+          - echo "Packaging application..."
+          - ${PACKAGE_COMMAND:-mvn package -DskipTests}
+
+          - echo "=== Build and Test Complete ==="
+        artifacts:
+          - target/**
+          - build/**
+          - dist/**
+          - "*.jar"
+          - "*.war"
+
+    # ==========================================================================
+    # CODE QUALITY ANALYSIS - Reusable for any project
+    # ==========================================================================
     - step: &code-quality
         name: Code Quality Analysis
         caches:
           - maven
           - maven-local
+          - gradle
+          - npm
+          - node
         script:
-          - echo "Running code quality checks..."
-          - mvn verify -DskipTests
+          - echo "=== Starting Code Quality Analysis ==="
 
+          # Quality check - Uses QUALITY_COMMAND variable or default
+          - echo "Running code quality checks..."
+          - ${QUALITY_COMMAND:-mvn verify -DskipTests}
+
+          # Add your quality tools here (customize per project)
+          # Example for SonarQube:
+          # - if [ -n "$SONAR_TOKEN" ]; then mvn sonar:sonar -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN; fi
+
+          - echo "=== Code Quality Analysis Complete ==="
+
+    # ==========================================================================
+    # DEPLOY TO STAGING - Parameterized deployment
+    # ==========================================================================
     - step: &deploy-staging
         name: Deploy to Staging
         deployment: staging
         script:
-          - echo "Deploying to staging environment..."
-          - echo "Artifact: target/*.jar"
-          # Add your deployment commands here
-          # Example: scp target/*.jar user@staging-server:/path/to/deploy/
+          - echo "=== Starting Staging Deployment ==="
+          - echo "Environment: STAGING"
+          - echo "Artifact: ${ARTIFACT_PATH:-target/*.jar}"
 
+          # Use custom deployment script if provided, otherwise use default
+          - |
+            if [ -n "$DEPLOY_STAGING_SCRIPT" ]; then
+              echo "Using custom staging deployment script..."
+              eval "$DEPLOY_STAGING_SCRIPT"
+            else
+              echo "No custom deployment script found."
+              echo "Set DEPLOY_STAGING_SCRIPT variable with your deployment commands"
+              echo "Example deployment commands:"
+              echo "  - scp ${ARTIFACT_PATH:-target/*.jar} user@staging-server:/path/"
+              echo "  - ssh user@staging-server 'systemctl restart app'"
+              echo "  - docker push your-registry/app:staging"
+            fi
+
+          - echo "=== Staging Deployment Complete ==="
+
+    # ==========================================================================
+    # DEPLOY TO PRODUCTION - Manual trigger with parameterization
+    # ==========================================================================
     - step: &deploy-production
         name: Deploy to Production
         deployment: production
         trigger: manual
         script:
-          - echo "Deploying to production environment..."
-          - echo "Artifact: target/*.jar"
-          # Add your deployment commands here
-          # Example: scp target/*.jar user@prod-server:/path/to/deploy/
+          - echo "=== Starting Production Deployment ==="
+          - echo "Environment: PRODUCTION"
+          - echo "Artifact: ${ARTIFACT_PATH:-target/*.jar}"
+          - echo "WARNING: This is a production deployment!"
+
+          # Use custom deployment script if provided, otherwise use default
+          - |
+            if [ -n "$DEPLOY_PRODUCTION_SCRIPT" ]; then
+              echo "Using custom production deployment script..."
+              eval "$DEPLOY_PRODUCTION_SCRIPT"
+            else
+              echo "No custom deployment script found."
+              echo "Set DEPLOY_PRODUCTION_SCRIPT variable with your deployment commands"
+              echo "Example deployment commands:"
+              echo "  - scp ${ARTIFACT_PATH:-target/*.jar} user@prod-server:/path/"
+              echo "  - ssh user@prod-server 'systemctl restart app'"
+              echo "  - docker push your-registry/app:latest"
+            fi
+
+          - echo "=== Production Deployment Complete ==="
+
+    # ==========================================================================
+    # SECURITY SCAN - Optional security scanning step
+    # ==========================================================================
+    - step: &security-scan
+        name: Security Scan
+        script:
+          - echo "=== Starting Security Scan ==="
+
+          # Add your security scanning tools here
+          # Examples:
+          # - OWASP Dependency Check for Maven
+          # - if [ -f pom.xml ]; then mvn dependency-check:check; fi
+
+          # - Snyk scanning
+          # - if [ -n "$SNYK_TOKEN" ]; then npm install -g snyk && snyk test; fi
+
+          # - Trivy for container scanning
+          # - if [ -n "$DOCKER_IMAGE" ]; then trivy image $DOCKER_IMAGE; fi
+
+          - echo "Configure security scanning in Repository Variables"
+          - echo "=== Security Scan Complete ==="
+
+# ==============================================================================
+# PIPELINE CONFIGURATIONS
+# ==============================================================================
+# These pipelines are pre-configured for common workflows
+# Customize the branch names and workflows as needed for your project
+# ==============================================================================
 
 pipelines:
+  # Default pipeline - Runs on all branches
   default:
     - step: *build-and-test
 
+  # Branch-specific pipelines
   branches:
+    # Main branch - Full CI/CD with staging deployment
     main:
       - step: *build-and-test
       - step: *code-quality
       - step: *deploy-staging
 
+    # Master branch - Full CI/CD with staging deployment
     master:
       - step: *build-and-test
       - step: *code-quality
       - step: *deploy-staging
 
+    # Development branch - Build and test only
+    develop:
+      - step: *build-and-test
+      - step: *code-quality
+
+    # Feature branches - Build and test
+    'feature/**':
+      - step: *build-and-test
+
+    # Hotfix branches - Full pipeline
+    'hotfix/**':
+      - step: *build-and-test
+      - step: *code-quality
+      - step: *deploy-staging
+
+  # Tag-based deployments
   tags:
+    # Release tags - Production deployment (manual approval required)
     'release-*':
       - step: *build-and-test
       - step: *code-quality
+      - step: *security-scan
       - step: *deploy-production
 
+    # Version tags - Production deployment
+    'v*':
+      - step: *build-and-test
+      - step: *code-quality
+      - step: *security-scan
+      - step: *deploy-production
+
+  # Pull request pipelines
   pull-requests:
     '**':
       - step: *build-and-test
       - step: *code-quality
 
-# Optional: Custom pipelines that can be triggered manually
+  # ==============================================================================
+  # CUSTOM PIPELINES - Manually triggered from Bitbucket UI
+  # ==============================================================================
   custom:
+    # Quick build without tests (for debugging)
     build-only:
       - step:
-          name: Build Only
+          name: Build Only (No Tests)
           caches:
             - maven
             - maven-local
+            - gradle
+            - npm
+            - node
           script:
-            - mvn clean compile
+            - echo "=== Quick Build (No Tests) ==="
+            - ${BUILD_COMMAND:-mvn clean compile}
+            - echo "=== Build Complete ==="
 
-    full-build-deploy:
+    # Full quality check without deployment
+    quality-check:
       - step: *build-and-test
       - step: *code-quality
+      - step: *security-scan
+
+    # Deploy to staging only
+    deploy-staging-only:
+      - step: *deploy-staging
+
+    # Full pipeline with all steps
+    full-pipeline:
+      - step: *build-and-test
+      - step: *code-quality
+      - step: *security-scan
       - step: *deploy-staging
       - step: *deploy-production
+
+    # Emergency hotfix deployment
+    emergency-deploy:
+      - step:
+          name: Emergency Production Deploy
+          deployment: production
+          script:
+            - echo "=== EMERGENCY DEPLOYMENT ==="
+            - echo "WARNING: Bypassing normal checks!"
+            - echo "Artifact: ${ARTIFACT_PATH:-target/*.jar}"
+            - |
+              if [ -n "$DEPLOY_PRODUCTION_SCRIPT" ]; then
+                eval "$DEPLOY_PRODUCTION_SCRIPT"
+              else
+                echo "Set DEPLOY_PRODUCTION_SCRIPT variable"
+              fi
+            - echo "=== Emergency Deployment Complete ==="
