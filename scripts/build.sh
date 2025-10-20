@@ -20,8 +20,9 @@ echo "Commit: $BITBUCKET_COMMIT"
 # Uncomment this section if you're using Maven
 if [ -f "pom.xml" ]; then
     echo "Detected Maven project (pom.xml found)"
-    echo "Running Maven build..."
-    mvn clean compile
+    echo "Running Maven compile (verification only)..."
+    echo "Note: Full packaging happens in package.sh to avoid duplication"
+    mvn compile -DskipTests
     exit 0
 fi
 
