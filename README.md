@@ -59,15 +59,35 @@ Run tests with:
 mvn test
 ```
 
-## Bitbucket Pipeline Configuration
+## Reusable Bitbucket Pipeline Configuration
 
-The project includes a comprehensive Bitbucket Pipeline configuration that automates:
+The project includes a **comprehensive and reusable** Bitbucket Pipeline configuration that can be used in ANY project!
+
+### Key Features
+
+- **Project-Agnostic**: Works with Maven, Gradle, npm, Python, Go, .NET, and more
+- **Fully Parameterized**: Customize via environment variables
+- **Multiple Workflows**: Automated pipelines for branches, tags, and pull requests
+- **Security Scanning**: Optional security checks
+- **Flexible Deployment**: Configure staging and production deployments
+- **Manual Controls**: Custom pipelines for specific scenarios
+
+### Quick Start for Reuse
+
+To use this pipeline in your own project:
+
+1. Copy `bitbucket-pipelines.yml` to your project
+2. Update the Docker `image` to match your stack
+3. Set build commands in Bitbucket Repository Variables
+4. Push and watch it work!
+
+**See [PIPELINE_REUSE_GUIDE.md](./PIPELINE_REUSE_GUIDE.md) for complete documentation.**
 
 ### Pipeline Features
 
 1. **Default Pipeline** (all branches)
    - Build and test the application
-   - Cache Maven dependencies for faster builds
+   - Cache dependencies for faster builds
 
 2. **Main/Master Branch Pipeline**
    - Build and test
@@ -78,14 +98,18 @@ The project includes a comprehensive Bitbucket Pipeline configuration that autom
    - Build and test
    - Code quality checks
 
-4. **Tag Pipeline** (release-*)
+4. **Tag Pipeline** (release-*, v*)
    - Build and test
    - Code quality analysis
+   - Security scanning
    - Manual deployment to production
 
 5. **Custom Pipelines**
    - `build-only`: Quick build without tests
-   - `full-build-deploy`: Complete pipeline with all deployments
+   - `quality-check`: Full quality analysis
+   - `deploy-staging-only`: Deploy to staging
+   - `full-pipeline`: Complete pipeline with all steps
+   - `emergency-deploy`: Emergency production deployment
 
 ### Pipeline Steps
 
@@ -120,28 +144,40 @@ Maven dependencies are cached to improve build performance:
 
 ### Adding Environment Variables
 
-Add environment variables in Bitbucket repository settings:
-- Go to Repository Settings → Pipelines → Repository variables
+Configure your build in Bitbucket repository settings:
+- Go to Repository Settings → Pipelines → Repository Variables
+
+Set these variables to customize for your project:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `BUILD_COMMAND` | Build command | `mvn clean compile` |
+| `TEST_COMMAND` | Test command | `mvn test` |
+| `PACKAGE_COMMAND` | Package command | `mvn package -DskipTests` |
+| `DEPLOY_STAGING_SCRIPT` | Staging deployment | `scp target/*.jar user@server:/path/` |
+| `DEPLOY_PRODUCTION_SCRIPT` | Production deployment | `kubectl apply -f deployment.yml` |
 
 ### Deployment Configuration
 
-Update the deployment steps in `bitbucket-pipelines.yml`:
+Configure deployment via repository variables:
 
-```yaml
-- step: &deploy-staging
-    name: Deploy to Staging
-    deployment: staging
-    script:
-      - # Add your deployment commands
+```bash
+# Example: Deploy to server via SCP
+DEPLOY_STAGING_SCRIPT=scp target/*.jar user@staging-server:/app/
+
+# Example: Deploy to Kubernetes
+DEPLOY_PRODUCTION_SCRIPT=kubectl set image deployment/myapp myapp=registry/myapp:$BITBUCKET_COMMIT
 ```
 
-### Adding More Steps
+### Reusing in Other Projects
 
-You can add additional steps like:
-- Security scanning
-- Code coverage reports
-- Docker image building
-- Database migrations
+This pipeline works with:
+- Java (Maven, Gradle)
+- Node.js (npm, yarn)
+- Python (pip, pytest)
+- .NET, Go, Ruby, PHP, and more!
+
+**See [PIPELINE_REUSE_GUIDE.md](./PIPELINE_REUSE_GUIDE.md) for detailed examples and configurations.**
 
 ## Development
 
