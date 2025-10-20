@@ -1,39 +1,18 @@
 # ==============================================================================
-# Multi-Stage Dockerfile for Spring Boot Applications
+# Optimized Dockerfile for Spring Boot Applications
 # ==============================================================================
 # This Dockerfile follows industry best practices:
-# - Multi-stage builds for minimal image size
+# - Uses pre-built artifacts (no duplicate builds)
+# - Minimal runtime image size
 # - Non-root user for security
 # - Health checks for container orchestration
-# - Layer caching optimization
-# - Distroless/minimal base images
+# ==============================================================================
+# IMPORTANT: This Dockerfile expects a pre-built JAR file in target/ directory
+# The JAR is built once in the CI pipeline to avoid duplication
 # ==============================================================================
 
 # ==============================================================================
-# Stage 1: Build Stage
-# ==============================================================================
-FROM maven:3.8.6-openjdk-17-slim AS build
-
-# Set working directory
-WORKDIR /app
-
-# Copy dependency files first for better layer caching
-COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
-
-# Download dependencies (this layer will be cached if pom.xml doesn't change)
-RUN mvn dependency:go-offline -B
-
-# Copy source code
-COPY src ./src
-
-# Build the application
-# Skip tests here as they should be run in CI pipeline
-RUN mvn clean package -DskipTests -B
-
-# ==============================================================================
-# Stage 2: Runtime Stage
+# Runtime Stage (Single stage - artifact already built)
 # ==============================================================================
 FROM eclipse-temurin:17-jre-alpine
 
@@ -53,8 +32,9 @@ RUN addgroup -g 1001 -S appuser && \
 # Set working directory
 WORKDIR /app
 
-# Copy the JAR from build stage
-COPY --from=build /app/target/*.jar app.jar
+# Copy the pre-built JAR from CI pipeline artifacts
+# This JAR was already built in the package.sh script
+COPY target/*.jar app.jar
 
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app

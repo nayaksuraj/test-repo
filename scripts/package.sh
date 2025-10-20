@@ -17,12 +17,20 @@ echo "=== Starting Package Process ==="
 # Uncomment this section if you're using Maven
 if [ -f "pom.xml" ]; then
     echo "Detected Maven project (pom.xml found)"
-    echo "Packaging with Maven..."
-    mvn package -DskipTests
+    echo "Packaging with Maven (single build - no duplication)..."
+    mvn clean package -DskipTests -B
 
     echo "Artifacts created:"
     ls -lh target/*.jar 2>/dev/null || echo "No JAR files found"
     ls -lh target/*.war 2>/dev/null || echo "No WAR files found"
+
+    # Create build-info directory for artifact metadata
+    mkdir -p build-info
+    echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > build-info/build.txt
+    echo "GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')" >> build-info/build.txt
+    echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')" >> build-info/build.txt
+
+    echo "Build info saved to build-info/build.txt"
     exit 0
 fi
 
