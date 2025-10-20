@@ -1,269 +1,395 @@
 # ==============================================================================
-# REUSABLE BITBUCKET PIPELINE CONFIGURATION
+# COMPREHENSIVE BITBUCKET PIPELINE WITH GIT FLOW & DOCKER/HELM/K8S
 # ==============================================================================
-# This pipeline is designed to be reusable across multiple projects
-# Simply copy this file and customize the scripts in the /scripts folder
+# This pipeline implements industry-standard CI/CD practices:
+# - Git Flow branching strategy
+# - Multi-stage testing (unit, integration, quality)
+# - Docker containerization with security scanning
+# - Helm chart packaging and deployment
+# - Environment-specific deployments (dev auto, stage/prod manual)
 # ==============================================================================
 
-# Default Docker image - Override this for your project needs
 image: maven:3.8.6-openjdk-17
 
 # ==============================================================================
-# SCRIPTS-BASED CONFIGURATION
+# Pipeline Options
 # ==============================================================================
-# This pipeline uses scripts in the /scripts folder for maximum flexibility:
-#
-# - scripts/build.sh: Build your application
-# - scripts/test.sh: Run tests
-# - scripts/package.sh: Package application for deployment
-# - scripts/deploy-staging.sh: Deploy to staging environment
-# - scripts/deploy-production.sh: Deploy to production environment
-#
-# Each script contains examples for multiple programming languages and frameworks.
-# Simply edit the scripts to match your project's needs!
-# ==============================================================================
+options:
+  max-time: 120  # Maximum pipeline execution time (minutes)
+  docker: true   # Enable Docker service for TestContainers and Docker builds
 
+# ==============================================================================
+# Caches for faster builds
+# ==============================================================================
 definitions:
   caches:
     maven-local: ~/.m2/repository
-    gradle: ~/.gradle
-    npm: $HOME/.npm
-    node: node_modules
+    docker-layers: /var/lib/docker
 
+  services:
+    docker:
+      memory: 3072  # Increase Docker memory for builds
+
+  # ==============================================================================
+  # Reusable Pipeline Steps
+  # ==============================================================================
   steps:
     # ==========================================================================
-    # BUILD AND TEST STEP - Works with any build tool
+    # 1. CODE CHECKOUT (Implicit in Bitbucket Pipelines)
     # ==========================================================================
-    - step: &build-and-test
-        name: Build and Test
+
+    # ==========================================================================
+    # 2. UNIT TESTS
+    # ==========================================================================
+    - step: &unit-tests
+        name: Unit Tests
         caches:
           - maven
           - maven-local
-          - gradle
-          - npm
-          - node
         script:
-          - echo "=== Starting Build and Test ==="
-          - echo "Project: $BITBUCKET_REPO_SLUG"
-          - echo "Branch: $BITBUCKET_BRANCH"
-          - echo "Commit: $BITBUCKET_COMMIT"
-
-          # Build step - Calls scripts/build.sh
-          - echo "Building application..."
-          - chmod +x scripts/build.sh
-          - ./scripts/build.sh
-
-          # Test step - Calls scripts/test.sh
-          - echo "Running tests..."
+          - echo "=== Running Unit Tests ==="
           - chmod +x scripts/test.sh
           - ./scripts/test.sh
-
-          # Package step - Calls scripts/package.sh
-          - echo "Packaging application..."
-          - chmod +x scripts/package.sh
-          - ./scripts/package.sh
-
-          - echo "=== Build and Test Complete ==="
+          - echo "=== Unit Tests Complete ==="
         artifacts:
-          - target/**
-          - build/**
-          - dist/**
-          - "*.jar"
-          - "*.war"
+          - target/surefire-reports/**
+          - target/site/jacoco/**
 
     # ==========================================================================
-    # CODE QUALITY ANALYSIS - Reusable for any project
+    # 3. INTEGRATION TESTS
     # ==========================================================================
-    - step: &code-quality
-        name: Code Quality Analysis
+    - step: &integration-tests
+        name: Integration Tests
+        services:
+          - docker
         caches:
           - maven
           - maven-local
-          - gradle
-          - npm
-          - node
         script:
-          - echo "=== Starting Code Quality Analysis ==="
+          - echo "=== Running Integration Tests ==="
+          - chmod +x scripts/integration-test.sh
+          - export DOCKER_REQUIRED=true
+          - ./scripts/integration-test.sh
+          - echo "=== Integration Tests Complete ==="
+        artifacts:
+          - target/failsafe-reports/**
+          - target/site/jacoco/**
 
-          # Optional: Create scripts/quality.sh for custom quality checks
-          - |
-            if [ -f "scripts/quality.sh" ]; then
-              echo "Running custom quality checks..."
-              chmod +x scripts/quality.sh
-              ./scripts/quality.sh
-            else
-              echo "No custom quality script found."
-              echo "Create scripts/quality.sh to add code quality checks."
-              echo "Examples: SonarQube, ESLint, Checkstyle, etc."
-            fi
-
+    # ==========================================================================
+    # 4. CODE QUALITY ANALYSIS
+    # ==========================================================================
+    - step: &code-quality
+        name: Code Quality & SonarQube
+        caches:
+          - maven
+          - maven-local
+        script:
+          - echo "=== Running Code Quality Analysis ==="
+          - chmod +x scripts/quality.sh
+          - export SONAR_ENABLED=${SONAR_ENABLED:-false}
+          - export SONAR_TOKEN=${SONAR_TOKEN}
+          - export SONAR_HOST_URL=${SONAR_HOST_URL}
+          - ./scripts/quality.sh
           - echo "=== Code Quality Analysis Complete ==="
+        artifacts:
+          - target/site/jacoco/**
+          - target/checkstyle-result.xml
+          - security-reports/**
 
     # ==========================================================================
-    # DEPLOY TO STAGING - Parameterized deployment
+    # 5. BUILD APPLICATION & PACKAGE
     # ==========================================================================
-    - step: &deploy-staging
+    - step: &build-package
+        name: Build and Package
+        caches:
+          - maven
+          - maven-local
+        script:
+          - echo "=== Building Application ==="
+          - chmod +x scripts/build.sh
+          - ./scripts/build.sh
+          - chmod +x scripts/package.sh
+          - ./scripts/package.sh
+          - echo "=== Build Complete ==="
+        artifacts:
+          - target/*.jar
+          - build-info/**
+
+    # ==========================================================================
+    # 6. DOCKER BUILD AND PUSH
+    # ==========================================================================
+    - step: &docker-build-push
+        name: Docker Build and Push
+        services:
+          - docker
+        caches:
+          - docker-layers
+        script:
+          - echo "=== Building Docker Image ==="
+          - chmod +x scripts/docker-build.sh
+          - export DOCKER_REGISTRY=${DOCKER_REGISTRY}
+          - export DOCKER_REPOSITORY=${DOCKER_REPOSITORY:-demo-app}
+          - export DOCKER_USERNAME=${DOCKER_USERNAME}
+          - export DOCKER_PASSWORD=${DOCKER_PASSWORD}
+          - export DOCKER_PUSH=true
+          - export VERSION=${BITBUCKET_TAG:-0.0.1-SNAPSHOT}
+          - ./scripts/docker-build.sh
+          - echo "=== Docker Build and Push Complete ==="
+        artifacts:
+          - build-info/docker-image.txt
+
+    # ==========================================================================
+    # 7. DOCKER IMAGE VULNERABILITY SCAN (Trivy)
+    # ==========================================================================
+    - step: &docker-scan
+        name: Docker Vulnerability Scan (Trivy)
+        services:
+          - docker
+        script:
+          - echo "=== Scanning Docker Image for Vulnerabilities ==="
+          - chmod +x scripts/docker-scan.sh
+          - export TRIVY_SEVERITY=${TRIVY_SEVERITY:-CRITICAL,HIGH,MEDIUM}
+          - export TRIVY_EXIT_CODE=${TRIVY_EXIT_CODE:-0}
+          - export SCAN_TYPE=both
+          - ./scripts/docker-scan.sh
+          - echo "=== Vulnerability Scan Complete ==="
+        artifacts:
+          - security-reports/**
+
+    # ==========================================================================
+    # 8. HELM CHART LINT, PACKAGE AND PUSH
+    # ==========================================================================
+    - step: &helm-package
+        name: Helm Chart Package and Push
+        script:
+          - echo "=== Packaging Helm Chart ==="
+          - chmod +x scripts/helm-package.sh
+          - export HELM_CHART_PATH=./helm-chart
+          - export HELM_REGISTRY=${HELM_REGISTRY}
+          - export HELM_REGISTRY_USERNAME=${HELM_REGISTRY_USERNAME}
+          - export HELM_REGISTRY_PASSWORD=${HELM_REGISTRY_PASSWORD}
+          - export HELM_PUSH=${HELM_PUSH:-true}
+          - ./scripts/helm-package.sh
+          - echo "=== Helm Package Complete ==="
+        artifacts:
+          - helm-packages/**
+          - build-info/helm-chart.txt
+
+    # ==========================================================================
+    # 9. DEPLOY TO DEVELOPMENT (Auto-Approve)
+    # ==========================================================================
+    - step: &deploy-dev
+        name: Deploy to Development
+        deployment: development
+        script:
+          - echo "=== Deploying to Development Environment ==="
+          - chmod +x scripts/deploy-dev.sh
+          - export NAMESPACE=${DEV_NAMESPACE:-dev}
+          - export KUBECONFIG=${KUBECONFIG}
+          - ./scripts/deploy-dev.sh
+          - echo "=== Development Deployment Complete ==="
+
+    # ==========================================================================
+    # 10. DEPLOY TO STAGING (Manual Approval)
+    # ==========================================================================
+    - step: &deploy-stage
         name: Deploy to Staging
         deployment: staging
+        trigger: manual
         script:
-          - echo "=== Starting Staging Deployment ==="
-          - echo "Environment: STAGING"
-
-          # Call staging deployment script
-          - chmod +x scripts/deploy-staging.sh
-          - ./scripts/deploy-staging.sh
-
+          - echo "=== Deploying to Staging Environment ==="
+          - chmod +x scripts/deploy-stage.sh
+          - export NAMESPACE=${STAGE_NAMESPACE:-staging}
+          - export KUBECONFIG=${KUBECONFIG}
+          - ./scripts/deploy-stage.sh
           - echo "=== Staging Deployment Complete ==="
 
     # ==========================================================================
-    # DEPLOY TO PRODUCTION - Manual trigger with parameterization
+    # 11. DEPLOY TO PRODUCTION (Manual Approval)
     # ==========================================================================
-    - step: &deploy-production
+    - step: &deploy-prod
         name: Deploy to Production
         deployment: production
         trigger: manual
         script:
-          - echo "=== Starting Production Deployment ==="
-          - echo "Environment: PRODUCTION"
-          - echo "WARNING: This is a production deployment!"
-
-          # Call production deployment script
-          - chmod +x scripts/deploy-production.sh
-          - ./scripts/deploy-production.sh
-
+          - echo "=== Deploying to Production Environment ==="
+          - chmod +x scripts/deploy-prod.sh
+          - export NAMESPACE=${PROD_NAMESPACE:-production}
+          - export KUBECONFIG=${KUBECONFIG}
+          - export AUTO_APPROVE=false
+          - ./scripts/deploy-prod.sh
           - echo "=== Production Deployment Complete ==="
 
-    # ==========================================================================
-    # SECURITY SCAN - Optional security scanning step
-    # ==========================================================================
-    - step: &security-scan
-        name: Security Scan
-        script:
-          - echo "=== Starting Security Scan ==="
-
-          # Add your security scanning tools here
-          # Examples:
-          # - OWASP Dependency Check for Maven
-          # - if [ -f pom.xml ]; then mvn dependency-check:check; fi
-
-          # - Snyk scanning
-          # - if [ -n "$SNYK_TOKEN" ]; then npm install -g snyk && snyk test; fi
-
-          # - Trivy for container scanning
-          # - if [ -n "$DOCKER_IMAGE" ]; then trivy image $DOCKER_IMAGE; fi
-
-          - echo "Configure security scanning in Repository Variables"
-          - echo "=== Security Scan Complete ==="
-
 # ==============================================================================
-# PIPELINE CONFIGURATIONS
+# GIT FLOW PIPELINE CONFIGURATIONS
 # ==============================================================================
-# These pipelines are pre-configured for common workflows
-# Customize the branch names and workflows as needed for your project
-# ==============================================================================
-
 pipelines:
-  # Default pipeline - Runs on all branches
+  # Default pipeline (for non-matching branches)
   default:
-    - step: *build-and-test
+    - step: *unit-tests
+    - step: *build-package
 
-  # Branch-specific pipelines
+  # ==============================================================================
+  # BRANCH-SPECIFIC PIPELINES (Git Flow)
+  # ==============================================================================
   branches:
-    # Main branch - Full CI/CD with staging deployment
-    main:
-      - step: *build-and-test
-      - step: *code-quality
-      - step: *deploy-staging
-
-    # Master branch - Full CI/CD with staging deployment
-    master:
-      - step: *build-and-test
-      - step: *code-quality
-      - step: *deploy-staging
-
-    # Development branch - Build and test only
-    develop:
-      - step: *build-and-test
-      - step: *code-quality
-
-    # Feature branches - Build and test
+    # ==========================================================================
+    # FEATURE BRANCHES: feature/*
+    # - Unit Tests
+    # - Integration Tests
+    # - Code Quality
+    # - Build Package
+    # ==========================================================================
     'feature/**':
-      - step: *build-and-test
+      - step: *unit-tests
+      - step: *integration-tests
+      - step: *code-quality
+      - step: *build-package
 
-    # Hotfix branches - Full pipeline
+    # ==========================================================================
+    # DEVELOP BRANCH: develop
+    # - All tests and quality checks
+    # - Docker build and push
+    # - Vulnerability scan
+    # - Helm package
+    # - Auto-deploy to DEV
+    # ==========================================================================
+    develop:
+      - step: *unit-tests
+      - step: *integration-tests
+      - step: *code-quality
+      - step: *build-package
+      - step: *docker-build-push
+      - step: *docker-scan
+      - step: *helm-package
+      - step: *deploy-dev
+
+    # ==========================================================================
+    # MAIN BRANCH: main
+    # - All tests and quality checks
+    # - Docker build and push
+    # - Vulnerability scan
+    # - Helm package
+    # - Auto-deploy to DEV
+    # - Manual deploy to STAGE
+    # ==========================================================================
+    main:
+      - step: *unit-tests
+      - step: *integration-tests
+      - step: *code-quality
+      - step: *build-package
+      - step: *docker-build-push
+      - step: *docker-scan
+      - step: *helm-package
+      - step: *deploy-dev
+      - step: *deploy-stage
+
+    # ==========================================================================
+    # RELEASE BRANCH: release
+    # - Full pipeline
+    # - Manual deploy to STAGE and PROD
+    # ==========================================================================
+    release:
+      - step: *unit-tests
+      - step: *integration-tests
+      - step: *code-quality
+      - step: *build-package
+      - step: *docker-build-push
+      - step: *docker-scan
+      - step: *helm-package
+      - step: *deploy-dev
+      - step: *deploy-stage
+      - step: *deploy-prod
+
+    # ==========================================================================
+    # HOTFIX BRANCHES: hotfix/*
+    # - Fast-track pipeline for critical fixes
+    # - Can deploy to all environments
+    # ==========================================================================
     'hotfix/**':
-      - step: *build-and-test
+      - step: *unit-tests
+      - step: *integration-tests
       - step: *code-quality
-      - step: *deploy-staging
+      - step: *build-package
+      - step: *docker-build-push
+      - step: *docker-scan
+      - step: *helm-package
+      - step: *deploy-dev
+      - step: *deploy-stage
+      - step: *deploy-prod
 
-  # Tag-based deployments
+  # ==============================================================================
+  # TAG-BASED DEPLOYMENTS
+  # ==============================================================================
   tags:
-    # Release tags - Production deployment (manual approval required)
-    'release-*':
-      - step: *build-and-test
-      - step: *code-quality
-      - step: *security-scan
-      - step: *deploy-production
-
-    # Version tags - Production deployment
+    # Production release tags (e.g., v1.0.0, v1.2.3)
     'v*':
-      - step: *build-and-test
+      - step: *unit-tests
+      - step: *integration-tests
       - step: *code-quality
-      - step: *security-scan
-      - step: *deploy-production
+      - step: *build-package
+      - step: *docker-build-push
+      - step: *docker-scan
+      - step: *helm-package
+      - step: *deploy-prod
 
-  # Pull request pipelines
+  # ==============================================================================
+  # PULL REQUEST PIPELINES
+  # ==============================================================================
   pull-requests:
     '**':
-      - step: *build-and-test
+      - step: *unit-tests
+      - step: *integration-tests
       - step: *code-quality
+      - step: *build-package
 
   # ==============================================================================
-  # CUSTOM PIPELINES - Manually triggered from Bitbucket UI
+  # CUSTOM/MANUAL PIPELINES
   # ==============================================================================
   custom:
-    # Quick build without tests (for debugging)
-    build-only:
-      - step:
-          name: Build Only (No Tests)
-          caches:
-            - maven
-            - maven-local
-            - gradle
-            - npm
-            - node
-          script:
-            - echo "=== Quick Build (No Tests) ==="
-            - chmod +x scripts/build.sh
-            - ./scripts/build.sh
-            - echo "=== Build Complete ==="
-
-    # Full quality check without deployment
-    quality-check:
-      - step: *build-and-test
+    # Full pipeline - Run everything
+    full-pipeline:
+      - step: *unit-tests
+      - step: *integration-tests
       - step: *code-quality
-      - step: *security-scan
+      - step: *build-package
+      - step: *docker-build-push
+      - step: *docker-scan
+      - step: *helm-package
+      - step: *deploy-dev
+      - step: *deploy-stage
+      - step: *deploy-prod
+
+    # Build and test only
+    build-and-test:
+      - step: *unit-tests
+      - step: *integration-tests
+      - step: *build-package
+
+    # Docker build only
+    docker-only:
+      - step: *build-package
+      - step: *docker-build-push
+      - step: *docker-scan
+
+    # Deploy to dev only
+    deploy-dev-only:
+      - step: *deploy-dev
 
     # Deploy to staging only
-    deploy-staging-only:
-      - step: *deploy-staging
+    deploy-stage-only:
+      - step: *deploy-stage
 
-    # Full pipeline with all steps
-    full-pipeline:
-      - step: *build-and-test
-      - step: *code-quality
-      - step: *security-scan
-      - step: *deploy-staging
-      - step: *deploy-production
-
-    # Emergency hotfix deployment
-    emergency-deploy:
+    # Emergency production deploy (skip tests - use with caution!)
+    emergency-prod-deploy:
       - step:
           name: Emergency Production Deploy
           deployment: production
+          trigger: manual
           script:
-            - echo "=== EMERGENCY DEPLOYMENT ==="
-            - echo "WARNING: Bypassing normal checks!"
-            - chmod +x scripts/deploy-production.sh
-            - ./scripts/deploy-production.sh
-            - echo "=== Emergency Deployment Complete ==="
+            - echo "=== EMERGENCY PRODUCTION DEPLOYMENT ==="
+            - echo "WARNING - Skipping tests and checks!"
+            - chmod +x scripts/deploy-prod.sh
+            - export NAMESPACE=${PROD_NAMESPACE:-production}
+            - export AUTO_APPROVE=false
+            - ./scripts/deploy-prod.sh

@@ -1,0 +1,98 @@
+# ==============================================================================
+# Development Environment Values
+# ==============================================================================
+# Override values for development environment
+# Usage: helm upgrade --install demo-app ./helm-chart -f helm-chart/values-dev.yaml
+# ==============================================================================
+
+# Lower replica count for dev
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: your-registry/demo-app
+  pullPolicy: Always
+  tag: "dev-latest"
+
+# Environment-specific annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/actuator/prometheus"
+  environment: "development"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Ingress for dev environment
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: demo-app-dev.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: demo-app-dev-tls
+      hosts:
+        - demo-app-dev.example.com
+
+# Lower resources for dev
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Disable autoscaling in dev
+autoscaling:
+  enabled: false
+
+# Development-specific environment variables
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "dev"
+  - name: JAVA_OPTS
+    value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xdebug"
+  - name: LOG_LEVEL
+    value: "DEBUG"
+  - name: ENVIRONMENT
+    value: "development"
+
+# Pod Disruption Budget - disabled for dev
+podDisruptionBudget:
+  enabled: false
+
+# More relaxed health checks for dev
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 5
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 5
+
+# ServiceMonitor for Prometheus (if available)
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /actuator/prometheus

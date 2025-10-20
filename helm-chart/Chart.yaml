@@ -1,0 +1,34 @@
+apiVersion: v2
+name: demo-app
+description: A reusable Helm chart for Spring Boot applications
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+version: 1.0.0
+
+# This is the version number of the application being deployed.
+# This version number should be incremented each time you make changes to the application.
+appVersion: "0.0.1-SNAPSHOT"
+
+# Maintainers
+maintainers:
+  - name: Your Team
+    email: your-team@example.com
+
+# Keywords for easier chart discovery
+keywords:
+  - spring-boot
+  - java
+  - microservice
+  - api
+
+# Home page URL
+home: https://bitbucket.org/your-org/your-repo
+
+# Source code URLs
+sources:
+  - https://bitbucket.org/your-org/your-repo
+
+# Chart icon (optional)
+# icon: https://example.com/icon.png

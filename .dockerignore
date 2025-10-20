@@ -1,0 +1,86 @@
+# ==============================================================================
+# Docker Ignore File
+# ==============================================================================
+# Excludes unnecessary files from Docker build context
+# This speeds up builds and reduces image size
+# ==============================================================================
+
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# CI/CD files
+bitbucket-pipelines.yml
+.github
+.gitlab-ci.yml
+Jenkinsfile
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+*.md
+docs/
+
+# IDE files
+.idea
+.vscode
+.eclipse
+.settings
+*.iml
+*.ipr
+*.iws
+
+# Build artifacts (will be built inside container)
+target/
+build/
+dist/
+out/
+*.class
+
+# Maven wrapper (optional - uncomment if you want to use system maven)
+# .mvn
+# mvnw
+# mvnw.cmd
+
+# Test files and coverage reports
+*.log
+*.tmp
+*.swp
+coverage/
+.nyc_output/
+test-results/
+.junit/
+
+# Environment files
+.env
+.env.*
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+*.bak
+*.orig
+
+# Helm charts (not needed in Docker image)
+helm-chart/
+charts/
+
+# Scripts (not needed in runtime image)
+scripts/
+
+# Node modules (if you have any frontend builds)
+node_modules/
+npm-debug.log
+
+# Terraform and infrastructure
+*.tfstate
+*.tfvars
+terraform/
+
+# Kubernetes manifests
+k8s/
+kubernetes/
+manifests/
