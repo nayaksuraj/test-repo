@@ -1,0 +1,92 @@
+image: maven:3.8.6-openjdk-17
+
+definitions:
+  caches:
+    maven-local: ~/.m2/repository
+
+  steps:
+    - step: &build-and-test
+        name: Build and Test
+        caches:
+          - maven
+          - maven-local
+        script:
+          - echo "Building Spring Boot application..."
+          - mvn clean compile
+          - echo "Running tests..."
+          - mvn test
+          - echo "Packaging application..."
+          - mvn package -DskipTests
+        artifacts:
+          - target/*.jar
+
+    - step: &code-quality
+        name: Code Quality Analysis
+        caches:
+          - maven
+          - maven-local
+        script:
+          - echo "Running code quality checks..."
+          - mvn verify -DskipTests
+
+    - step: &deploy-staging
+        name: Deploy to Staging
+        deployment: staging
+        script:
+          - echo "Deploying to staging environment..."
+          - echo "Artifact: target/*.jar"
+          # Add your deployment commands here
+          # Example: scp target/*.jar user@staging-server:/path/to/deploy/
+
+    - step: &deploy-production
+        name: Deploy to Production
+        deployment: production
+        trigger: manual
+        script:
+          - echo "Deploying to production environment..."
+          - echo "Artifact: target/*.jar"
+          # Add your deployment commands here
+          # Example: scp target/*.jar user@prod-server:/path/to/deploy/
+
+pipelines:
+  default:
+    - step: *build-and-test
+
+  branches:
+    main:
+      - step: *build-and-test
+      - step: *code-quality
+      - step: *deploy-staging
+
+    master:
+      - step: *build-and-test
+      - step: *code-quality
+      - step: *deploy-staging
+
+  tags:
+    'release-*':
+      - step: *build-and-test
+      - step: *code-quality
+      - step: *deploy-production
+
+  pull-requests:
+    '**':
+      - step: *build-and-test
+      - step: *code-quality
+
+# Optional: Custom pipelines that can be triggered manually
+  custom:
+    build-only:
+      - step:
+          name: Build Only
+          caches:
+            - maven
+            - maven-local
+          script:
+            - mvn clean compile
+
+    full-build-deploy:
+      - step: *build-and-test
+      - step: *code-quality
+      - step: *deploy-staging
+      - step: *deploy-production
