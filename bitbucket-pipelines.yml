@@ -2,24 +2,25 @@
 # REUSABLE BITBUCKET PIPELINE CONFIGURATION
 # ==============================================================================
 # This pipeline is designed to be reusable across multiple projects
-# Simply copy this file and customize the variables below for your project
+# Simply copy this file and customize the scripts in the /scripts folder
 # ==============================================================================
 
 # Default Docker image - Override this for your project needs
 image: maven:3.8.6-openjdk-17
 
 # ==============================================================================
-# CONFIGURATION VARIABLES (Customize these in Repository Variables)
+# SCRIPTS-BASED CONFIGURATION
 # ==============================================================================
-# Set these in: Repository Settings > Pipelines > Repository Variables
+# This pipeline uses scripts in the /scripts folder for maximum flexibility:
 #
-# BUILD_COMMAND: Command to build the project (default: mvn clean compile)
-# TEST_COMMAND: Command to run tests (default: mvn test)
-# PACKAGE_COMMAND: Command to package the app (default: mvn package -DskipTests)
-# QUALITY_COMMAND: Command for code quality (default: mvn verify -DskipTests)
-# ARTIFACT_PATH: Path to build artifacts (default: target/*.jar)
-# DEPLOY_STAGING_SCRIPT: Custom staging deployment script
-# DEPLOY_PRODUCTION_SCRIPT: Custom production deployment script
+# - scripts/build.sh: Build your application
+# - scripts/test.sh: Run tests
+# - scripts/package.sh: Package application for deployment
+# - scripts/deploy-staging.sh: Deploy to staging environment
+# - scripts/deploy-production.sh: Deploy to production environment
+#
+# Each script contains examples for multiple programming languages and frameworks.
+# Simply edit the scripts to match your project's needs!
 # ==============================================================================
 
 definitions:
@@ -47,17 +48,20 @@ definitions:
           - echo "Branch: $BITBUCKET_BRANCH"
           - echo "Commit: $BITBUCKET_COMMIT"
 
-          # Build step - Uses BUILD_COMMAND variable or default
+          # Build step - Calls scripts/build.sh
           - echo "Building application..."
-          - ${BUILD_COMMAND:-mvn clean compile}
+          - chmod +x scripts/build.sh
+          - ./scripts/build.sh
 
-          # Test step - Uses TEST_COMMAND variable or default
+          # Test step - Calls scripts/test.sh
           - echo "Running tests..."
-          - ${TEST_COMMAND:-mvn test}
+          - chmod +x scripts/test.sh
+          - ./scripts/test.sh
 
-          # Package step - Uses PACKAGE_COMMAND variable or default
+          # Package step - Calls scripts/package.sh
           - echo "Packaging application..."
-          - ${PACKAGE_COMMAND:-mvn package -DskipTests}
+          - chmod +x scripts/package.sh
+          - ./scripts/package.sh
 
           - echo "=== Build and Test Complete ==="
         artifacts:
@@ -81,13 +85,17 @@ definitions:
         script:
           - echo "=== Starting Code Quality Analysis ==="
 
-          # Quality check - Uses QUALITY_COMMAND variable or default
-          - echo "Running code quality checks..."
-          - ${QUALITY_COMMAND:-mvn verify -DskipTests}
-
-          # Add your quality tools here (customize per project)
-          # Example for SonarQube:
-          # - if [ -n "$SONAR_TOKEN" ]; then mvn sonar:sonar -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN; fi
+          # Optional: Create scripts/quality.sh for custom quality checks
+          - |
+            if [ -f "scripts/quality.sh" ]; then
+              echo "Running custom quality checks..."
+              chmod +x scripts/quality.sh
+              ./scripts/quality.sh
+            else
+              echo "No custom quality script found."
+              echo "Create scripts/quality.sh to add code quality checks."
+              echo "Examples: SonarQube, ESLint, Checkstyle, etc."
+            fi
 
           - echo "=== Code Quality Analysis Complete ==="
 
@@ -100,21 +108,10 @@ definitions:
         script:
           - echo "=== Starting Staging Deployment ==="
           - echo "Environment: STAGING"
-          - echo "Artifact: ${ARTIFACT_PATH:-target/*.jar}"
 
-          # Use custom deployment script if provided, otherwise use default
-          - |
-            if [ -n "$DEPLOY_STAGING_SCRIPT" ]; then
-              echo "Using custom staging deployment script..."
-              eval "$DEPLOY_STAGING_SCRIPT"
-            else
-              echo "No custom deployment script found."
-              echo "Set DEPLOY_STAGING_SCRIPT variable with your deployment commands"
-              echo "Example deployment commands:"
-              echo "  - scp ${ARTIFACT_PATH:-target/*.jar} user@staging-server:/path/"
-              echo "  - ssh user@staging-server 'systemctl restart app'"
-              echo "  - docker push your-registry/app:staging"
-            fi
+          # Call staging deployment script
+          - chmod +x scripts/deploy-staging.sh
+          - ./scripts/deploy-staging.sh
 
           - echo "=== Staging Deployment Complete ==="
 
@@ -128,22 +125,11 @@ definitions:
         script:
           - echo "=== Starting Production Deployment ==="
           - echo "Environment: PRODUCTION"
-          - echo "Artifact: ${ARTIFACT_PATH:-target/*.jar}"
           - echo "WARNING: This is a production deployment!"
 
-          # Use custom deployment script if provided, otherwise use default
-          - |
-            if [ -n "$DEPLOY_PRODUCTION_SCRIPT" ]; then
-              echo "Using custom production deployment script..."
-              eval "$DEPLOY_PRODUCTION_SCRIPT"
-            else
-              echo "No custom deployment script found."
-              echo "Set DEPLOY_PRODUCTION_SCRIPT variable with your deployment commands"
-              echo "Example deployment commands:"
-              echo "  - scp ${ARTIFACT_PATH:-target/*.jar} user@prod-server:/path/"
-              echo "  - ssh user@prod-server 'systemctl restart app'"
-              echo "  - docker push your-registry/app:latest"
-            fi
+          # Call production deployment script
+          - chmod +x scripts/deploy-production.sh
+          - ./scripts/deploy-production.sh
 
           - echo "=== Production Deployment Complete ==="
 
@@ -248,7 +234,8 @@ pipelines:
             - node
           script:
             - echo "=== Quick Build (No Tests) ==="
-            - ${BUILD_COMMAND:-mvn clean compile}
+            - chmod +x scripts/build.sh
+            - ./scripts/build.sh
             - echo "=== Build Complete ==="
 
     # Full quality check without deployment
@@ -277,11 +264,6 @@ pipelines:
           script:
             - echo "=== EMERGENCY DEPLOYMENT ==="
             - echo "WARNING: Bypassing normal checks!"
-            - echo "Artifact: ${ARTIFACT_PATH:-target/*.jar}"
-            - |
-              if [ -n "$DEPLOY_PRODUCTION_SCRIPT" ]; then
-                eval "$DEPLOY_PRODUCTION_SCRIPT"
-              else
-                echo "Set DEPLOY_PRODUCTION_SCRIPT variable"
-              fi
+            - chmod +x scripts/deploy-production.sh
+            - ./scripts/deploy-production.sh
             - echo "=== Emergency Deployment Complete ==="
