@@ -1,0 +1,199 @@
+# ==============================================================================
+# Default Values for Helm Chart
+# ==============================================================================
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+# Override these values using environment-specific values files
+# ==============================================================================
+
+# Replicas for the deployment
+replicaCount: 2
+
+# Image configuration
+image:
+  repository: your-registry/demo-app
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion
+  tag: ""
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+  # - name: registry-secret
+
+# Override the chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# Service Account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/actuator/prometheus"
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: demo-app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: demo-app-tls
+      hosts:
+        - demo-app.example.com
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Startup probe configuration (for slow starting applications)
+startupProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Environment variables
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "default"
+  - name: JAVA_OPTS
+    value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+# Environment variables from ConfigMap
+envFrom: []
+  # - configMapRef:
+  #     name: app-config
+
+# Environment variables from Secrets
+envFromSecret: []
+  # - secretRef:
+  #     name: app-secrets
+
+# ConfigMap data
+configMap:
+  enabled: false
+  data: {}
+    # application.yaml: |
+    #   server:
+    #     port: 8080
+
+# Secret data (base64 encoded values)
+secret:
+  enabled: false
+  data: {}
+    # DATABASE_PASSWORD: "cGFzc3dvcmQ="
+
+# ServiceMonitor for Prometheus Operator
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /actuator/prometheus
+  labels: {}
+
+# Volume mounts
+volumeMounts: []
+  # - name: config
+  #   mountPath: /config
+  #   readOnly: true
+
+# Volumes
+volumes: []
+  # - name: config
+  #   configMap:
+  #     name: app-config
+
+# Extra labels to add to all resources
+extraLabels: {}
+
+# Rolling update strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0

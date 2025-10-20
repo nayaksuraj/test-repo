@@ -1,0 +1,161 @@
+# ==============================================================================
+# Production Environment Values
+# ==============================================================================
+# Override values for production environment
+# Usage: helm upgrade --install demo-app ./helm-chart -f helm-chart/values-prod.yaml
+# ==============================================================================
+
+# High availability replica count
+replicaCount: 3
+
+# Image configuration
+image:
+  repository: your-registry/demo-app
+  pullPolicy: IfNotPresent
+  tag: ""  # Will be set via CI/CD with specific version tag
+
+# Environment-specific annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/actuator/prometheus"
+  environment: "production"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # If using AWS
+
+# Ingress for production environment
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+  hosts:
+    - host: demo-app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: demo-app-prod-tls
+      hosts:
+        - demo-app.example.com
+
+# Production resources with buffer
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+# Aggressive autoscaling for production
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+# Production environment variables
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "prod"
+  - name: JAVA_OPTS
+    value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+  - name: LOG_LEVEL
+    value: "WARN"
+  - name: ENVIRONMENT
+    value: "production"
+
+# Pod Disruption Budget - ensure availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Conservative health checks for production
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 90
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+# ServiceMonitor for Prometheus
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  path: /actuator/prometheus
+  labels:
+    release: prometheus
+
+# Strong anti-affinity for production
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - demo-app
+        topologyKey: kubernetes.io/hostname
+  # Prefer different availability zones
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - demo-app
+          topologyKey: topology.kubernetes.io/zone
+
+# Node selector for production nodes (optional)
+nodeSelector:
+  node-type: production
+
+# Tolerations for production nodes (optional)
+tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "production"
+    effect: "NoSchedule"
+
+# Rolling update strategy - careful rollout
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
