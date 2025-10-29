@@ -226,6 +226,12 @@ definitions:
           - docker
         script:
           - echo "=== Enhanced Container Security Scanning ==="
+          # Login to Docker registry if credentials provided
+          - |
+            if [[ -n "${DOCKER_USERNAME}" ]] && [[ -n "${DOCKER_PASSWORD}" ]]; then
+              echo "Logging into Docker registry..."
+              echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin ${DOCKER_REGISTRY}
+            fi
           - chmod +x scripts/docker-scan.sh
           - export TRIVY_SEVERITY=CRITICAL,HIGH,MEDIUM
           - export TRIVY_EXIT_CODE=1  # BLOCKING on vulnerabilities
