@@ -1,0 +1,266 @@
+# ==============================================================================
+# EXAMPLE: Using Bitbucket Pipes from Reusable Pipeline Library
+# ==============================================================================
+# This pipeline demonstrates how to use custom Bitbucket Pipes
+# stored in a separate repository (yourorg/bitbucket-pipeline-library)
+#
+# SETUP REQUIRED:
+# 1. Build and publish pipes: see .pipeline-library/pipes/*/README.md
+# 2. Push to Docker registry (Docker Hub or private registry)
+# 3. Replace 'yourorg' with your organization name
+# ==============================================================================
+
+image: maven:3.8.6-openjdk-17
+
+options:
+  max-time: 120
+  docker: true
+
+definitions:
+  caches:
+    maven-local: ~/.m2/repository
+
+pipelines:
+  # ==============================================================================
+  # DEFAULT PIPELINE - Using Custom Pipes
+  # ==============================================================================
+  default:
+    # SHIFT-LEFT: Secrets scanning FIRST (fail fast)
+    - pipe: docker://yourorg/secrets-scan-pipe:1.0.0
+      variables:
+        FAIL_ON_SECRETS: true
+        SCAN_PATH: "."
+        DEBUG: false
+
+    # Parallel testing
+    - parallel:
+        - step:
+            name: Unit Tests
+            caches:
+              - maven
+              - maven-local
+            script:
+              - chmod +x scripts/test.sh
+              - ./scripts/test.sh
+
+        - step:
+            name: Integration Tests
+            services:
+              - docker
+            caches:
+              - maven
+              - maven-local
+            script:
+              - chmod +x scripts/integration-test.sh
+              - export DOCKER_REQUIRED=true
+              - ./scripts/integration-test.sh
+
+    # Build with SBOM
+    - step:
+        name: Build & SBOM
+        caches:
+          - maven
+          - maven-local
+        script:
+          - chmod +x scripts/build.sh scripts/package.sh
+          - ./scripts/build.sh
+          - ./scripts/package.sh
+        artifacts:
+          - target/*.jar
+          - build-info/**
+
+    # Use SBOM generation pipe
+    - pipe: docker://yourorg/sbom-generate-pipe:1.0.0
+      variables:
+        SBOM_FORMAT: "cyclonedx"
+        OUTPUT_DIR: "security-reports/sbom"
+        ATTACH_TO_ARTIFACT: true
+
+  # ==============================================================================
+  # DEVELOP BRANCH - Full DevSecOps with Pipes
+  # ==============================================================================
+  branches:
+    develop:
+      # PHASE 1: Security First
+      - pipe: docker://yourorg/secrets-scan-pipe:1.0.0
+        variables:
+          FAIL_ON_SECRETS: true
+
+      # PHASE 2: Dependency & Code Security (Parallel)
+      - parallel:
+          - pipe: docker://yourorg/dependency-scan-pipe:1.0.0
+            variables:
+              CVSS_THRESHOLD: 7.0
+              FAIL_ON_CVSS: true
+
+          - step:
+              name: SAST & Code Quality
+              caches:
+                - maven
+                - maven-local
+              script:
+                - chmod +x scripts/quality.sh
+                - export SONAR_ENABLED=${SONAR_ENABLED:-true}
+                - ./scripts/quality.sh
+
+      # PHASE 3: Build & Test
+      - parallel:
+          - step:
+              name: Unit Tests
+              caches:
+                - maven
+                - maven-local
+              script:
+                - chmod +x scripts/test.sh
+                - ./scripts/test.sh
+
+          - step:
+              name: Integration Tests
+              services:
+                - docker
+              caches:
+                - maven
+                - maven-local
+              script:
+                - chmod +x scripts/integration-test.sh
+                - ./scripts/integration-test.sh
+
+      # PHASE 4: Build with SBOM
+      - step:
+          name: Build Application
+          caches:
+            - maven
+            - maven-local
+          script:
+            - chmod +x scripts/build.sh scripts/package.sh
+            - ./scripts/build.sh
+            - ./scripts/package.sh
+          artifacts:
+            - target/*.jar
+
+      - pipe: docker://yourorg/sbom-generate-pipe:1.0.0
+        variables:
+          SBOM_FORMAT: "cyclonedx"
+
+      # PHASE 5: Container Security
+      - pipe: docker://yourorg/dockerfile-scan-pipe:1.0.0
+        variables:
+          DOCKERFILE_PATH: "./Dockerfile"
+          FAIL_ON_ERROR: false
+
+      - step:
+          name: Docker Build
+          services:
+            - docker
+          script:
+            - chmod +x scripts/docker-build.sh
+            - export DOCKER_PUSH=true
+            - export VERSION=0.0.1-SNAPSHOT
+            - ./scripts/docker-build.sh
+          artifacts:
+            - build-info/docker-image.txt
+
+      - pipe: docker://yourorg/container-scan-pipe:1.0.0
+        variables:
+          TRIVY_SEVERITY: "CRITICAL,HIGH,MEDIUM"
+          TRIVY_EXIT_CODE: 1
+          SCAN_TYPE: "both"
+
+      # PHASE 6: IaC Security & Helm
+      - parallel:
+          - pipe: docker://yourorg/iac-scan-pipe:1.0.0
+            variables:
+              HELM_CHART_PATH: "./helm-chart"
+              FAIL_ON_HIGH: false
+
+          - step:
+              name: Helm Package
+              script:
+                - chmod +x scripts/helm-package.sh
+                - export HELM_CHART_PATH=./helm-chart
+                - ./scripts/helm-package.sh
+              artifacts:
+                - helm-packages/**
+
+      # PHASE 7: Deploy
+      - step:
+          name: Deploy to Development
+          deployment: development
+          script:
+            - chmod +x scripts/deploy-dev.sh
+            - export NAMESPACE=dev
+            - ./scripts/deploy-dev.sh
+
+  # ==============================================================================
+  # PULL REQUESTS - Security Validation with Pipes
+  # ==============================================================================
+  pull-requests:
+    '**':
+      - pipe: docker://yourorg/secrets-scan-pipe:1.0.0
+        variables:
+          FAIL_ON_SECRETS: true
+
+      - pipe: docker://yourorg/dependency-scan-pipe:1.0.0
+        variables:
+          CVSS_THRESHOLD: 7.0
+          FAIL_ON_CVSS: true
+
+      - parallel:
+          - step:
+              name: Unit Tests
+              caches:
+                - maven
+              script:
+                - mvn test
+
+          - step:
+              name: Code Quality
+              caches:
+                - maven
+              script:
+                - mvn verify
+
+      - step:
+          name: Build
+          caches:
+            - maven
+          script:
+            - mvn package
+
+  # ==============================================================================
+  # CUSTOM PIPELINES
+  # ==============================================================================
+  custom:
+    # Security audit using only pipes
+    security-audit-pipes:
+      - pipe: docker://yourorg/secrets-scan-pipe:1.0.0
+      - pipe: docker://yourorg/dependency-scan-pipe:1.0.0
+      - pipe: docker://yourorg/dockerfile-scan-pipe:1.0.0
+      - pipe: docker://yourorg/container-scan-pipe:1.0.0
+      - pipe: docker://yourorg/iac-scan-pipe:1.0.0
+
+    # Quick validation
+    quick-security-check:
+      - pipe: docker://yourorg/secrets-scan-pipe:1.0.0
+        variables:
+          FAIL_ON_SECRETS: true
+      - pipe: docker://yourorg/dependency-scan-pipe:1.0.0
+        variables:
+          CVSS_THRESHOLD: 9.0
+          FAIL_ON_CVSS: true
+
+# ==============================================================================
+# NOTES
+# ==============================================================================
+# Advantages of using Pipes:
+# - ✅ Clean, readable pipeline configuration
+# - ✅ Versioned and reusable components
+# - ✅ Easy to update (just change version tag)
+# - ✅ Consistent across all projects
+# - ✅ Official Bitbucket pattern
+#
+# Prerequisites:
+# 1. Build pipes: cd .pipeline-library/pipes/<pipe-name> && docker build .
+# 2. Push to registry: docker push yourorg/<pipe-name>:1.0.0
+# 3. Use in pipeline: pipe: docker://yourorg/<pipe-name>:1.0.0
+# ==============================================================================
