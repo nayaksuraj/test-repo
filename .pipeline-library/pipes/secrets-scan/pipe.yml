@@ -1,0 +1,35 @@
+name: Secrets Scanner
+image: yourorg/secrets-scan-pipe:{{version}}
+description: Scan code for secrets and credentials using GitLeaks
+repository: https://bitbucket.org/yourorg/bitbucket-pipeline-library
+tags:
+  - security
+  - secrets
+  - gitleaks
+  - shift-left
+
+variables:
+  - name: FAIL_ON_SECRETS
+    type: boolean
+    default: "true"
+    description: Fail the pipeline if secrets are detected
+
+  - name: SCAN_PATH
+    type: string
+    default: "."
+    description: Path to scan for secrets
+
+  - name: GITLEAKS_VERSION
+    type: string
+    default: "8.18.0"
+    description: Version of GitLeaks to use
+
+  - name: REPORT_FORMAT
+    type: string
+    default: "json"
+    description: Report format (json, sarif, csv)
+
+  - name: DEBUG
+    type: boolean
+    default: "false"
+    description: Enable debug mode

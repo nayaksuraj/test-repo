@@ -1,0 +1,147 @@
+# ==============================================================================
+# Pre-Commit Hooks Configuration - SHIFT-LEFT SECURITY
+# ==============================================================================
+# This file configures pre-commit hooks to catch issues before code is committed
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# ==============================================================================
+
+repos:
+  # ==============================================================================
+  # 1. SECRETS SCANNING - CRITICAL
+  # ==============================================================================
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+        name: Detect secrets and credentials
+        description: Scan for hardcoded secrets, API keys, and credentials
+        entry: gitleaks detect --source . --verbose --redact --no-git
+        language: golang
+        pass_filenames: false
+
+  # Alternative: detect-secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets (Yelp)
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package.lock.json
+
+  # ==============================================================================
+  # 2. CODE QUALITY & SECURITY
+  # ==============================================================================
+  # Trailing whitespace
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ['--unsafe']  # Allow custom YAML tags (for Helm)
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+
+  # ==============================================================================
+  # 3. DOCKERFILE SECURITY
+  # ==============================================================================
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Lint Dockerfiles
+        description: Check Dockerfile best practices and security
+
+  # ==============================================================================
+  # 4. SHELL SCRIPT LINTING
+  # ==============================================================================
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: ShellCheck - Shell script linting
+        args: ['-e', 'SC1091']  # Exclude "not following" errors
+
+  # ==============================================================================
+  # 5. KUBERNETES/HELM SECURITY
+  # ==============================================================================
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: forbid-crlf
+        name: Forbid CRLF line endings
+      - id: remove-crlf
+        name: Remove CRLF line endings
+
+  # ==============================================================================
+  # 6. COMMIT MESSAGE LINTING
+  # ==============================================================================
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        name: Conventional Commits
+        stages: [commit-msg]
+        args: []  # Optional: enforce conventional commits format
+
+  # ==============================================================================
+  # 7. JSON/XML VALIDATION
+  # ==============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-xml
+        name: Check XML syntax
+      - id: pretty-format-json
+        name: Pretty format JSON
+        args: ['--autofix', '--no-sort-keys']
+
+  # ==============================================================================
+  # 8. MAVEN/JAVA SPECIFIC (Optional)
+  # ==============================================================================
+  # Uncomment if you want to run Maven checks pre-commit
+  # - repo: local
+  #   hooks:
+  #     - id: maven-test
+  #       name: Run Maven Tests
+  #       entry: mvn test
+  #       language: system
+  #       pass_filenames: false
+  #       stages: [push]  # Only on push, not every commit
+
+# ==============================================================================
+# Pre-Commit Configuration
+# ==============================================================================
+default_language_version:
+  python: python3
+
+# Fail fast on first error
+fail_fast: false
+
+# Minimum pre-commit version
+minimum_pre_commit_version: '2.20.0'
+
+# ==============================================================================
+# Custom Local Hooks
+# ==============================================================================
+# - repo: local
+#   hooks:
+#     - id: security-scan-local
+#       name: Quick Security Scan
+#       entry: ./scripts/security-secrets-scan.sh
+#       language: script
+#       pass_filenames: false
+#       stages: [commit]
