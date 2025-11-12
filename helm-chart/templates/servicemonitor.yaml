@@ -2,16 +2,16 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "demo-app.fullname" . }}
+  name: {{ include "app.fullname" . }}
   labels:
-    {{- include "demo-app.labels" . | nindent 4 }}
+    {{- include "app.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
   selector:
     matchLabels:
-      {{- include "demo-app.selectorLabels" . | nindent 6 }}
+      {{- include "app.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: http
       path: {{ .Values.serviceMonitor.path }}

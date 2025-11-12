@@ -10,8 +10,10 @@
 replicaCount: 2
 
 # Image configuration
+# REQUIRED: Set image.repository to your container registry and application name
+# Example: docker.io/myorg/myapp or registry.company.com/team/application
 image:
-  repository: your-registry/demo-app
+  repository: ""  # REQUIRED: Set via --set image.repository or values override
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion
   tag: ""
@@ -68,14 +70,14 @@ ingress:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
   hosts:
-    - host: demo-app.example.com
+    - host: app.example.com  # Update with your domain
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: demo-app-tls
+    - secretName: app-tls  # Update with your TLS secret name
       hosts:
-        - demo-app.example.com
+        - app.example.com  # Update with your domain
 
 # Resource limits and requests
 resources:

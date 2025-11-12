@@ -2,7 +2,7 @@
 # Production Environment Values
 # ==============================================================================
 # Override values for production environment
-# Usage: helm upgrade --install demo-app ./helm-chart -f helm-chart/values-prod.yaml
+# Usage: helm upgrade --install myapp ./helm-chart -f helm-chart/values-prod.yaml
 # ==============================================================================
 
 # High availability replica count
@@ -10,7 +10,7 @@ replicaCount: 3
 
 # Image configuration
 image:
-  repository: your-registry/demo-app
+  repository: your-registry/myapp
   pullPolicy: IfNotPresent
   tag: ""  # Will be set via CI/CD with specific version tag
 
@@ -40,14 +40,14 @@ ingress:
     nginx.ingress.kubernetes.io/enable-modsecurity: "true"
     nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
   hosts:
-    - host: demo-app.example.com
+    - host: myapp.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: demo-app-prod-tls
+    - secretName: myapp-prod-tls
       hosts:
-        - demo-app.example.com
+        - myapp.example.com
 
 # Production resources with buffer
 resources:
@@ -127,7 +127,7 @@ affinity:
             - key: app.kubernetes.io/name
               operator: In
               values:
-                - demo-app
+                - myapp
         topologyKey: kubernetes.io/hostname
   # Prefer different availability zones
   podAntiAffinity:
@@ -139,7 +139,7 @@ affinity:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                  - demo-app
+                  - myapp
           topologyKey: topology.kubernetes.io/zone
 
 # Node selector for production nodes (optional)

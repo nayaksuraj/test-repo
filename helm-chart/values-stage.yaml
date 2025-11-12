@@ -2,7 +2,7 @@
 # Staging Environment Values
 # ==============================================================================
 # Override values for staging environment
-# Usage: helm upgrade --install demo-app ./helm-chart -f helm-chart/values-stage.yaml
+# Usage: helm upgrade --install myapp ./helm-chart -f helm-chart/values-stage.yaml
 # ==============================================================================
 
 # Production-like replica count
@@ -10,7 +10,7 @@ replicaCount: 2
 
 # Image configuration
 image:
-  repository: your-registry/demo-app
+  repository: your-registry/myapp
   pullPolicy: IfNotPresent
   tag: "stage-latest"
 
@@ -36,14 +36,14 @@ ingress:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/rate-limit: "100"
   hosts:
-    - host: demo-app-stage.example.com
+    - host: myapp-stage.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: demo-app-stage-tls
+    - secretName: myapp-stage-tls
       hosts:
-        - demo-app-stage.example.com
+        - myapp-stage.example.com
 
 # Production-like resources
 resources:
@@ -125,5 +125,5 @@ affinity:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                  - demo-app
+                  - myapp
           topologyKey: kubernetes.io/hostname

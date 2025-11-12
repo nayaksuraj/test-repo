@@ -2,7 +2,7 @@
 # Development Environment Values
 # ==============================================================================
 # Override values for development environment
-# Usage: helm upgrade --install demo-app ./helm-chart -f helm-chart/values-dev.yaml
+# Usage: helm upgrade --install myapp ./helm-chart -f helm-chart/values-dev.yaml
 # ==============================================================================
 
 # Lower replica count for dev
@@ -10,7 +10,7 @@ replicaCount: 1
 
 # Image configuration
 image:
-  repository: your-registry/demo-app
+  repository: your-registry/myapp
   pullPolicy: Always
   tag: "dev-latest"
 
@@ -35,14 +35,14 @@ ingress:
     cert-manager.io/cluster-issuer: "letsencrypt-staging"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   hosts:
-    - host: demo-app-dev.example.com
+    - host: myapp-dev.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: demo-app-dev-tls
+    - secretName: myapp-dev-tls
       hosts:
-        - demo-app-dev.example.com
+        - myapp-dev.example.com
 
 # Lower resources for dev
 resources:

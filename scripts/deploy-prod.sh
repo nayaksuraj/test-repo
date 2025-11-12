@@ -15,7 +15,7 @@ set -o pipefail  # Exit on pipe failure
 # ==============================================================================
 ENVIRONMENT="prod"
 NAMESPACE="${NAMESPACE:-production}"
-RELEASE_NAME="${RELEASE_NAME:-demo-app}"
+RELEASE_NAME="${RELEASE_NAME:-app}"
 HELM_CHART_PATH="${HELM_CHART_PATH:-./helm-chart}"
 VALUES_FILE="${VALUES_FILE:-$HELM_CHART_PATH/values-prod.yaml}"
 KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
@@ -87,7 +87,7 @@ CURRENT_REVISION=$(helm history "$RELEASE_NAME" -n "$NAMESPACE" --max 1 -o json 
 echo "Current revision: $CURRENT_REVISION"
 
 # Create snapshot of current deployment
-kubectl get deployment "$RELEASE_NAME-demo-app" -n "$NAMESPACE" -o yaml > /tmp/deployment-backup-$(date +%Y%m%d-%H%M%S).yaml 2>/dev/null || true
+kubectl get deployment "$RELEASE_NAME-app" -n "$NAMESPACE" -o yaml > /tmp/deployment-backup-$(date +%Y%m%d-%H%M%S).yaml 2>/dev/null || true
 echo "✓ Deployment backup created"
 echo ""
 
@@ -142,13 +142,13 @@ echo ""
 echo "=== Post-Deployment Verification ==="
 
 # Wait for rollout (more time for production)
-kubectl rollout status deployment/"$RELEASE_NAME-demo-app" -n "$NAMESPACE" --timeout=15m
+kubectl rollout status deployment/"$RELEASE_NAME-app" -n "$NAMESPACE" --timeout=15m
 
 echo ""
 echo "=== Running Production Smoke Tests ==="
 
 # Get service endpoint
-SERVICE_NAME="$RELEASE_NAME-demo-app"
+SERVICE_NAME="$RELEASE_NAME-app"
 SERVICE_PORT=$(kubectl get service "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.ports[0].port}')
 
 # Port-forward for smoke tests
