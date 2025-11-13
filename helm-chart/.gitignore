@@ -1,0 +1,27 @@
+# Helm Chart .gitignore
+
+# Helm temporary files
+*.tgz
+*.tar.gz
+Chart.lock
+
+# Helm dependency charts
+charts/*.tgz
+
+# Temporary files created during chart development
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test outputs
+test-output/

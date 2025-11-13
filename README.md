@@ -11,6 +11,29 @@ This repository provides two complete Bitbucket Pipeline configurations that can
 
 Both pipelines follow Git Flow branching strategy and include parallel execution for optimal performance.
 
+## 🎯 Two Approaches: Pipes vs Scripts
+
+This repository provides **two ways** to implement CI/CD:
+
+### ✨ **Recommended: Bitbucket Pipes** (Newer Approach)
+Modular, Docker-based reusable components that can be versioned and shared across projects.
+- 📍 Located in `bitbucket-pipes/` directory
+- ✅ **Pros**: Versioned, portable, easier to maintain, language-agnostic
+- 📖 See: [bitbucket-pipes/README.md](bitbucket-pipes/README.md) for full documentation
+- 💡 Example: [bitbucket-pipelines-using-pipes-v2.yml](bitbucket-pipelines-using-pipes-v2.yml)
+
+### 📜 **Traditional: Shell Scripts** (Legacy Approach)
+Bash scripts that run directly in the pipeline environment.
+- 📍 Located in `scripts/` directory
+- ✅ **Pros**: Simple, no Docker required, easier to debug locally
+- 📖 See: [scripts/README.md](scripts/README.md) for details
+- 💡 Used by: [bitbucket-pipelines.yml](bitbucket-pipelines.yml) and [bitbucket-pipelines-devsecops.yml](bitbucket-pipelines-devsecops.yml)
+
+**Which should I use?**
+- **New projects**: Use Bitbucket Pipes (recommended)
+- **Existing projects**: Continue with scripts, or migrate gradually
+- **See**: [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for migration instructions
+
 ## 🚀 Quick Start
 
 ### For a New Project
@@ -101,9 +124,23 @@ TRIVY_SEVERITY           # Scan severity levels (default: CRITICAL,HIGH,MEDIUM)
 
 ```
 .
-├── bitbucket-pipelines.yml              # Standard CI/CD pipeline
-├── bitbucket-pipelines-devsecops.yml    # DevSecOps enhanced pipeline
-├── scripts/                             # Reusable pipeline scripts
+├── bitbucket-pipelines.yml              # Standard CI/CD pipeline (uses scripts/)
+├── bitbucket-pipelines-devsecops.yml    # DevSecOps enhanced pipeline (uses scripts/)
+├── bitbucket-pipelines-using-pipes-v2.yml  # Example pipeline using Bitbucket Pipes
+│
+├── bitbucket-pipes/                     # ⭐ Reusable Bitbucket Pipes (RECOMMENDED)
+│   ├── README.md                        # Pipes documentation
+│   ├── CI/                              # Continuous Integration pipes
+│   │   ├── build-pipe/                  # Generic build pipe (Maven, Gradle, npm, Python, Go, .NET, Rust, Ruby)
+│   │   ├── test-pipe/                   # Unit & integration testing
+│   │   ├── quality-pipe/                # SonarQube, linting, static analysis
+│   │   └── security-pipe/               # Comprehensive security scanning
+│   └── CD/                              # Continuous Deployment pipes
+│       ├── docker-pipe/                 # Docker build, scan, and push
+│       ├── helm-pipe/                   # Helm chart operations
+│       └── deploy-pipe/                 # Kubernetes deployment
+│
+├── scripts/                             # Traditional shell scripts (legacy approach)
 │   ├── build.sh                         # Application build
 │   ├── package.sh                       # Application packaging
 │   ├── test.sh                          # Unit tests
@@ -120,8 +157,10 @@ TRIVY_SEVERITY           # Scan severity levels (default: CRITICAL,HIGH,MEDIUM)
 │   ├── security-dockerfile-scan.sh      # Dockerfile security
 │   ├── security-iac-scan.sh             # IaC security
 │   └── security-sbom-generate.sh        # SBOM generation
+│
 ├── helm-chart/                          # Kubernetes Helm chart
 ├── Dockerfile                           # Container image definition
+├── MIGRATION_GUIDE.md                   # Guide for migrating from scripts to pipes
 └── README.md                            # This file
 ```
 

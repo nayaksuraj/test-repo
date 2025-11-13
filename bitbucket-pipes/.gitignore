@@ -1,0 +1,33 @@
+# Bitbucket Pipes .gitignore
+
+# Docker build context
+**/build/
+**/dist/
+
+# Pipe testing artifacts
+**/test-output/
+**/test-results/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs from pipe development
+*.log
+
+# Don't ignore pipe.yml, pipe.sh, README.md, or Dockerfiles
+!pipe.yml
+!pipe.sh
+!README.md
+!Dockerfile
