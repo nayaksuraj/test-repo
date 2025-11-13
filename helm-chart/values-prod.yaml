@@ -2,15 +2,17 @@
 # Production Environment Values
 # ==============================================================================
 # Override values for production environment
-# Usage: helm upgrade --install myapp ./helm-chart -f helm-chart/values-prod.yaml
+# Usage: helm upgrade --install <release-name> ./helm-chart -f helm-chart/values-prod.yaml
+#   Example: helm upgrade --install myapp ./helm-chart -f helm-chart/values-prod.yaml
 # ==============================================================================
 
 # High availability replica count
 replicaCount: 3
 
 # Image configuration
+# REQUIRED: Update repository to your actual registry and app name
 image:
-  repository: your-registry/myapp
+  repository: ""  # e.g., docker.io/myorg/myapp or registry.company.com/myapp
   pullPolicy: IfNotPresent
   tag: ""  # Will be set via CI/CD with specific version tag
 
@@ -40,14 +42,14 @@ ingress:
     nginx.ingress.kubernetes.io/enable-modsecurity: "true"
     nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
   hosts:
-    - host: myapp.example.com
+    - host: app.example.com  # UPDATE: Replace with your actual production domain
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: myapp-prod-tls
+    - secretName: app-prod-tls  # UPDATE: Replace with your TLS secret name
       hosts:
-        - myapp.example.com
+        - app.example.com  # UPDATE: Must match host above
 
 # Production resources with buffer
 resources:
@@ -119,6 +121,7 @@ serviceMonitor:
     release: prometheus
 
 # Strong anti-affinity for production
+# NOTE: The 'app' value below should match your Chart.yaml name or be updated to your app name
 affinity:
   podAntiAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
@@ -127,7 +130,7 @@ affinity:
             - key: app.kubernetes.io/name
               operator: In
               values:
-                - myapp
+                - app  # Must match Chart.yaml name (default: "app")
         topologyKey: kubernetes.io/hostname
   # Prefer different availability zones
   podAntiAffinity:
@@ -139,7 +142,7 @@ affinity:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                  - myapp
+                  - app  # Must match Chart.yaml name (default: "app")
           topologyKey: topology.kubernetes.io/zone
 
 # Node selector for production nodes (optional)

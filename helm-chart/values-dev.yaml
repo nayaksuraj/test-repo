@@ -2,15 +2,17 @@
 # Development Environment Values
 # ==============================================================================
 # Override values for development environment
-# Usage: helm upgrade --install myapp ./helm-chart -f helm-chart/values-dev.yaml
+# Usage: helm upgrade --install <release-name> ./helm-chart -f helm-chart/values-dev.yaml
+#   Example: helm upgrade --install myapp ./helm-chart -f helm-chart/values-dev.yaml
 # ==============================================================================
 
 # Lower replica count for dev
 replicaCount: 1
 
 # Image configuration
+# REQUIRED: Update repository to your actual registry and app name
 image:
-  repository: your-registry/myapp
+  repository: ""  # e.g., docker.io/myorg/myapp or registry.company.com/myapp
   pullPolicy: Always
   tag: "dev-latest"
 
@@ -35,14 +37,14 @@ ingress:
     cert-manager.io/cluster-issuer: "letsencrypt-staging"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   hosts:
-    - host: myapp-dev.example.com
+    - host: app-dev.example.com  # UPDATE: Replace with your actual domain
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: myapp-dev-tls
+    - secretName: app-dev-tls  # UPDATE: Replace with your TLS secret name
       hosts:
-        - myapp-dev.example.com
+        - app-dev.example.com  # UPDATE: Must match host above
 
 # Lower resources for dev
 resources:
