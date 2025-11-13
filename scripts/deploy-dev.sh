@@ -14,7 +14,7 @@ set -o pipefail  # Exit on pipe failure
 # ==============================================================================
 ENVIRONMENT="dev"
 NAMESPACE="${NAMESPACE:-dev}"
-RELEASE_NAME="${RELEASE_NAME:-demo-app}"
+RELEASE_NAME="${RELEASE_NAME:-app}"
 HELM_CHART_PATH="${HELM_CHART_PATH:-./helm-chart}"
 VALUES_FILE="${VALUES_FILE:-$HELM_CHART_PATH/values-dev.yaml}"
 KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
@@ -120,7 +120,7 @@ echo "=== Post-Deployment Verification ==="
 
 # Wait for rollout to complete
 echo "Waiting for deployment to be ready..."
-kubectl rollout status deployment/"$RELEASE_NAME-demo-app" -n "$NAMESPACE" --timeout=5m || true
+kubectl rollout status deployment/"$RELEASE_NAME-app" -n "$NAMESPACE" --timeout=5m || true
 
 # Get service information
 echo ""

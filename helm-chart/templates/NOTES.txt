@@ -1,0 +1,79 @@
+===============================================================================
+Thank you for installing {{ .Chart.Name }}!
+
+Release Name: {{ .Release.Name }}
+Namespace:    {{ .Release.Namespace }}
+Chart Version: {{ .Chart.Version }}
+App Version:   {{ .Chart.AppVersion }}
+===============================================================================
+
+🎉 Your application has been deployed successfully!
+
+{{- if .Values.ingress.enabled }}
+
+🌐 Application URL:
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+{{- end }}
+
+{{- else }}
+
+📝 To access your application, follow these steps:
+
+1. Get the service name:
+   kubectl get service {{ include "app.fullname" . }} -n {{ .Release.Namespace }}
+
+2. Forward the port to your local machine:
+   kubectl port-forward service/{{ include "app.fullname" . }} 8080:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+
+3. Access the application:
+   http://localhost:8080
+
+{{- end }}
+
+📊 Check the deployment status:
+   kubectl get deployment {{ include "app.fullname" . }} -n {{ .Release.Namespace }}
+
+📋 View pods:
+   kubectl get pods -l app.kubernetes.io/name={{ include "app.name" . }} -n {{ .Release.Namespace }}
+
+📖 View logs:
+   kubectl logs -l app.kubernetes.io/name={{ include "app.name" . }} -n {{ .Release.Namespace }} --tail=100 -f
+
+{{- if .Values.autoscaling.enabled }}
+
+⚙️  Horizontal Pod Autoscaler is enabled:
+   Min Replicas: {{ .Values.autoscaling.minReplicas }}
+   Max Replicas: {{ .Values.autoscaling.maxReplicas }}
+   Target CPU:   {{ .Values.autoscaling.targetCPUUtilizationPercentage }}%
+{{- if .Values.autoscaling.targetMemoryUtilizationPercentage }}
+   Target Memory: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}%
+{{- end }}
+
+   kubectl get hpa {{ include "app.fullname" . }} -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.serviceMonitor.enabled }}
+
+📈 Prometheus ServiceMonitor is enabled
+   Metrics are being collected at: {{ .Values.serviceMonitor.path }}
+{{- end }}
+
+===============================================================================
+💡 Useful Commands:
+
+# Upgrade the release with new values:
+helm upgrade {{ .Release.Name }} {{ .Chart.Name }} -f your-values.yaml
+
+# Check release history:
+helm history {{ .Release.Name }}
+
+# Rollback to previous version:
+helm rollback {{ .Release.Name }}
+
+# Uninstall the release:
+helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+===============================================================================
+📚 For more information, visit: {{ .Chart.Home }}
+===============================================================================

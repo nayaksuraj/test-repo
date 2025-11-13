@@ -2,15 +2,17 @@
 # Staging Environment Values
 # ==============================================================================
 # Override values for staging environment
-# Usage: helm upgrade --install demo-app ./helm-chart -f helm-chart/values-stage.yaml
+# Usage: helm upgrade --install <release-name> ./helm-chart -f helm-chart/values-stage.yaml
+#   Example: helm upgrade --install myapp ./helm-chart -f helm-chart/values-stage.yaml
 # ==============================================================================
 
 # Production-like replica count
 replicaCount: 2
 
 # Image configuration
+# REQUIRED: Update repository to your actual registry and app name
 image:
-  repository: your-registry/demo-app
+  repository: ""  # e.g., docker.io/myorg/myapp or registry.company.com/myapp
   pullPolicy: IfNotPresent
   tag: "stage-latest"
 
@@ -36,14 +38,14 @@ ingress:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/rate-limit: "100"
   hosts:
-    - host: demo-app-stage.example.com
+    - host: app-stage.example.com  # UPDATE: Replace with your actual domain
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: demo-app-stage-tls
+    - secretName: app-stage-tls  # UPDATE: Replace with your TLS secret name
       hosts:
-        - demo-app-stage.example.com
+        - app-stage.example.com  # UPDATE: Must match host above
 
 # Production-like resources
 resources:
@@ -115,6 +117,7 @@ serviceMonitor:
     release: prometheus
 
 # Anti-affinity for better distribution
+# NOTE: The 'app' value below should match your Chart.yaml name or be updated to your app name
 affinity:
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -125,5 +128,5 @@ affinity:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                  - demo-app
+                  - app  # Must match Chart.yaml name (default: "app")
           topologyKey: kubernetes.io/hostname

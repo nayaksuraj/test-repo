@@ -1,0 +1,55 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+
+# Various IDEs
+.project
+.idea/
+*.tmproj
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (include in package, but can exclude drafts)
+*.md~
+./*.draft.md
+
+# CI/CD files (not needed in chart package)
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Testing files
+test/
+tests/
+*.test.yaml
+*_test.yaml
+
+# Development files
+*.development.yaml
+*.local.yaml
+scripts/
+
+# Misc
+README.md.gotmpl

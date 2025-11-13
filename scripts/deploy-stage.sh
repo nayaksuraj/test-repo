@@ -15,7 +15,7 @@ set -o pipefail  # Exit on pipe failure
 # ==============================================================================
 ENVIRONMENT="stage"
 NAMESPACE="${NAMESPACE:-staging}"
-RELEASE_NAME="${RELEASE_NAME:-demo-app}"
+RELEASE_NAME="${RELEASE_NAME:-app}"
 HELM_CHART_PATH="${HELM_CHART_PATH:-./helm-chart}"
 VALUES_FILE="${VALUES_FILE:-$HELM_CHART_PATH/values-stage.yaml}"
 KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
@@ -117,13 +117,13 @@ echo ""
 echo "=== Post-Deployment Verification ==="
 
 # Wait for rollout
-kubectl rollout status deployment/"$RELEASE_NAME-demo-app" -n "$NAMESPACE" --timeout=10m
+kubectl rollout status deployment/"$RELEASE_NAME-app" -n "$NAMESPACE" --timeout=10m
 
 echo ""
 echo "=== Running Smoke Tests ==="
 
 # Get service endpoint
-SERVICE_NAME="$RELEASE_NAME-demo-app"
+SERVICE_NAME="$RELEASE_NAME-app"
 SERVICE_PORT=$(kubectl get service "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.ports[0].port}')
 
 # Port-forward for smoke tests (if not using ingress)
