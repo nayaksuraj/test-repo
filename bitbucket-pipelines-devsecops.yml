@@ -206,8 +206,10 @@ definitions:
         script:
           - echo "=== Building Docker Image ==="
           - chmod +x scripts/docker-build.sh
+          # REQUIRED: DOCKER_REGISTRY and DOCKER_REPOSITORY must be set as pipeline variables
+          # Example: DOCKER_REGISTRY=docker.io, DOCKER_REPOSITORY=myorg/myapp
           - export DOCKER_REGISTRY=${DOCKER_REGISTRY}
-          - export DOCKER_REPOSITORY=${DOCKER_REPOSITORY:-demo-app}
+          - export DOCKER_REPOSITORY=${DOCKER_REPOSITORY}
           - export DOCKER_USERNAME=${DOCKER_USERNAME}
           - export DOCKER_PASSWORD=${DOCKER_PASSWORD}
           - export DOCKER_PUSH=true

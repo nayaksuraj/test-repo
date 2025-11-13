@@ -120,7 +120,13 @@ echo "=== Post-Deployment Verification ==="
 
 # Wait for rollout to complete
 echo "Waiting for deployment to be ready..."
-kubectl rollout status deployment/"$RELEASE_NAME-app" -n "$NAMESPACE" --timeout=5m || true
+# Use label selector instead of hardcoded deployment name
+DEPLOYMENT_NAME=$(kubectl get deployment -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -n "$DEPLOYMENT_NAME" ]]; then
+    kubectl rollout status deployment/"$DEPLOYMENT_NAME" -n "$NAMESPACE" --timeout=5m || true
+else
+    echo "Warning: No deployment found with label app.kubernetes.io/instance=$RELEASE_NAME"
+fi
 
 # Get service information
 echo ""

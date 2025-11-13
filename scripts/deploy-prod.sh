@@ -87,8 +87,14 @@ CURRENT_REVISION=$(helm history "$RELEASE_NAME" -n "$NAMESPACE" --max 1 -o json 
 echo "Current revision: $CURRENT_REVISION"
 
 # Create snapshot of current deployment
-kubectl get deployment "$RELEASE_NAME-app" -n "$NAMESPACE" -o yaml > /tmp/deployment-backup-$(date +%Y%m%d-%H%M%S).yaml 2>/dev/null || true
-echo "✓ Deployment backup created"
+# Use label selector to find deployment dynamically
+DEPLOYMENT_NAME=$(kubectl get deployment -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -n "$DEPLOYMENT_NAME" ]]; then
+    kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o yaml > /tmp/deployment-backup-$(date +%Y%m%d-%H%M%S).yaml 2>/dev/null || true
+    echo "✓ Deployment backup created for $DEPLOYMENT_NAME"
+else
+    echo "ℹ No existing deployment found (first deployment)"
+fi
 echo ""
 
 # ==============================================================================
@@ -142,13 +148,24 @@ echo ""
 echo "=== Post-Deployment Verification ==="
 
 # Wait for rollout (more time for production)
-kubectl rollout status deployment/"$RELEASE_NAME-app" -n "$NAMESPACE" --timeout=15m
+# Use label selector to find deployment dynamically
+DEPLOYMENT_NAME=$(kubectl get deployment -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -n "$DEPLOYMENT_NAME" ]]; then
+    kubectl rollout status deployment/"$DEPLOYMENT_NAME" -n "$NAMESPACE" --timeout=15m
+else
+    echo "ERROR: No deployment found with label app.kubernetes.io/instance=$RELEASE_NAME"
+    exit 1
+fi
 
 echo ""
 echo "=== Running Production Smoke Tests ==="
 
-# Get service endpoint
-SERVICE_NAME="$RELEASE_NAME-app"
+# Get service endpoint - use label selector to find service dynamically
+SERVICE_NAME=$(kubectl get service -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -z "$SERVICE_NAME" ]]; then
+    echo "ERROR: No service found with label app.kubernetes.io/instance=$RELEASE_NAME"
+    exit 1
+fi
 SERVICE_PORT=$(kubectl get service "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.ports[0].port}')
 
 # Port-forward for smoke tests

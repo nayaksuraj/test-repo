@@ -12,8 +12,18 @@ set -o pipefail  # Exit on pipe failure
 # ==============================================================================
 # Configuration Variables (Override via environment or pipeline variables)
 # ==============================================================================
-DOCKER_REGISTRY="${DOCKER_REGISTRY:-your-registry.example.com}"
-DOCKER_REPOSITORY="${DOCKER_REPOSITORY:-demo-app}"
+# REQUIRED: These must be set via environment variables
+if [[ -z "${DOCKER_REGISTRY}" ]]; then
+    echo "ERROR: DOCKER_REGISTRY environment variable is required"
+    echo "Example: export DOCKER_REGISTRY=docker.io"
+    exit 1
+fi
+
+if [[ -z "${DOCKER_REPOSITORY}" ]]; then
+    echo "ERROR: DOCKER_REPOSITORY environment variable is required"
+    echo "Example: export DOCKER_REPOSITORY=myorg/myapp"
+    exit 1
+fi
 DOCKERFILE_PATH="${DOCKERFILE_PATH:-./Dockerfile}"
 
 # Get Git information

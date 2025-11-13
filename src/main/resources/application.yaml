@@ -4,7 +4,9 @@
 
 spring:
   application:
-    name: demo-app
+    # Use environment variable or default to 'app'
+    # Set via: export SPRING_APPLICATION_NAME=your-app-name
+    name: ${SPRING_APPLICATION_NAME:app}
 
 server:
   port: 8080

@@ -18,8 +18,23 @@ set -o pipefail  # Exit on pipe failure
 SONAR_ENABLED="${SONAR_ENABLED:-false}"
 SONAR_HOST_URL="${SONAR_HOST_URL:-https://sonarcloud.io}"
 SONAR_TOKEN="${SONAR_TOKEN:-}"
-SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-demo-app}"
-SONAR_ORGANIZATION="${SONAR_ORGANIZATION:-your-org}"
+
+# REQUIRED: SONAR_PROJECT_KEY must be set when SONAR_ENABLED=true
+if [[ "${SONAR_ENABLED}" == "true" ]]; then
+    if [[ -z "${SONAR_PROJECT_KEY}" ]]; then
+        echo "ERROR: SONAR_PROJECT_KEY is required when SONAR_ENABLED=true"
+        echo "Example: export SONAR_PROJECT_KEY=my-project-key"
+        exit 1
+    fi
+    if [[ -z "${SONAR_ORGANIZATION}" ]]; then
+        echo "ERROR: SONAR_ORGANIZATION is required when SONAR_ENABLED=true"
+        echo "Example: export SONAR_ORGANIZATION=my-org"
+        exit 1
+    fi
+fi
+
+SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-}"
+SONAR_ORGANIZATION="${SONAR_ORGANIZATION:-}"
 
 # Maven/Gradle detection
 BUILD_TOOL="maven"

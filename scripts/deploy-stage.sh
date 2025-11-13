@@ -117,13 +117,24 @@ echo ""
 echo "=== Post-Deployment Verification ==="
 
 # Wait for rollout
-kubectl rollout status deployment/"$RELEASE_NAME-app" -n "$NAMESPACE" --timeout=10m
+# Use label selector to find deployment dynamically
+DEPLOYMENT_NAME=$(kubectl get deployment -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -n "$DEPLOYMENT_NAME" ]]; then
+    kubectl rollout status deployment/"$DEPLOYMENT_NAME" -n "$NAMESPACE" --timeout=10m
+else
+    echo "ERROR: No deployment found with label app.kubernetes.io/instance=$RELEASE_NAME"
+    exit 1
+fi
 
 echo ""
 echo "=== Running Smoke Tests ==="
 
-# Get service endpoint
-SERVICE_NAME="$RELEASE_NAME-app"
+# Get service endpoint - use label selector to find service dynamically
+SERVICE_NAME=$(kubectl get service -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -z "$SERVICE_NAME" ]]; then
+    echo "ERROR: No service found with label app.kubernetes.io/instance=$RELEASE_NAME"
+    exit 1
+fi
 SERVICE_PORT=$(kubectl get service "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.ports[0].port}')
 
 # Port-forward for smoke tests (if not using ingress)
