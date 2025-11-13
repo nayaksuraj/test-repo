@@ -1,0 +1,55 @@
+name: Test Pipe
+image: nayaksuraj/test-pipe:1.0.0
+description: Generic test execution pipe that auto-detects test frameworks and runs unit and integration tests
+repository: https://github.com/nayaksuraj/test-repo
+
+variables:
+  - name: TEST_COMMAND
+    description: 'Custom test command to override auto-detection'
+    required: false
+
+  - name: TEST_TOOL
+    description: 'Specify test tool explicitly (maven, gradle, npm, pytest, go, dotnet, yarn)'
+    required: false
+
+  - name: TEST_ARGS
+    description: 'Additional arguments to pass to the test command'
+    required: false
+    default: ''
+
+  - name: INTEGRATION_TESTS
+    description: 'Run integration tests in addition to unit tests (true/false)'
+    required: false
+    default: 'false'
+
+  - name: WORKING_DIR
+    description: 'Working directory where tests should be executed'
+    required: false
+    default: '.'
+
+  - name: SKIP_TESTS
+    description: 'Skip test execution (useful for debugging)'
+    required: false
+    default: 'false'
+
+  - name: COVERAGE_ENABLED
+    description: 'Enable code coverage collection (true/false)'
+    required: false
+    default: 'false'
+
+  - name: DOCKER_REQUIRED
+    description: 'Docker is required for integration tests with TestContainers (true/false)'
+    required: false
+    default: 'false'
+
+  - name: DEBUG
+    description: 'Enable debug mode for verbose output (true/false)'
+    required: false
+    default: 'false'
+
+tags:
+  - testing
+  - unit-tests
+  - integration-tests
+  - ci
+  - automation

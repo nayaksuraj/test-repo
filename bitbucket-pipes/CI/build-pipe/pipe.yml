@@ -1,0 +1,37 @@
+name: Build Application
+description: Generic build pipe that detects and builds applications (Maven, Gradle, npm, Python, Go, etc.)
+repository: https://github.com/nayaksuraj/test-repo
+
+# Pipe metadata
+metadata:
+  type: ci
+  category: build
+  vendor: nayaksuraj
+  version: 1.0.0
+
+# Variables that can be configured
+variables:
+  - name: BUILD_COMMAND
+    description: Custom build command (auto-detected if not specified)
+    required: false
+    example: "mvn clean package"
+
+  - name: BUILD_TOOL
+    description: Force specific build tool (maven, gradle, npm, python, go, dotnet)
+    required: false
+    example: "maven"
+
+  - name: BUILD_ARGS
+    description: Additional arguments for build command
+    required: false
+    example: "-DskipTests"
+
+  - name: WORKING_DIR
+    description: Working directory for build
+    required: false
+    default: "."
+
+  - name: DEBUG
+    description: Enable debug output
+    required: false
+    default: "false"

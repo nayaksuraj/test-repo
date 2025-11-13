@@ -1,0 +1,84 @@
+name: Quality Pipe
+image: nayaksuraj/quality-pipe:1.0.0
+description: Code quality analysis pipe with SonarQube, linting, and coverage support for multiple languages
+repository: https://github.com/nayaksuraj/test-repo
+
+variables:
+  - name: QUALITY_COMMAND
+    description: 'Custom quality command to override auto-detection'
+    required: false
+
+  - name: SONAR_ENABLED
+    description: 'Enable SonarQube/SonarCloud analysis (true/false)'
+    required: false
+    default: 'false'
+
+  - name: SONAR_TOKEN
+    description: 'SonarQube authentication token (required if SONAR_ENABLED=true)'
+    required: false
+
+  - name: SONAR_HOST_URL
+    description: 'SonarQube server URL'
+    required: false
+    default: 'https://sonarcloud.io'
+
+  - name: SONAR_PROJECT_KEY
+    description: 'SonarQube project key'
+    required: false
+
+  - name: SONAR_ORGANIZATION
+    description: 'SonarCloud organization (required for SonarCloud)'
+    required: false
+
+  - name: CHECKSTYLE_ENABLED
+    description: 'Enable Checkstyle analysis for Java (true/false)'
+    required: false
+    default: 'false'
+
+  - name: LINT_ENABLED
+    description: 'Enable linting (ESLint, Pylint, etc.) (true/false)'
+    required: false
+    default: 'true'
+
+  - name: COVERAGE_ENABLED
+    description: 'Generate code coverage reports (true/false)'
+    required: false
+    default: 'true'
+
+  - name: COVERAGE_THRESHOLD
+    description: 'Minimum code coverage percentage required'
+    required: false
+    default: '80'
+
+  - name: FAIL_ON_LOW_COVERAGE
+    description: 'Fail pipeline if coverage is below threshold (true/false)'
+    required: false
+    default: 'false'
+
+  - name: SPOTBUGS_ENABLED
+    description: 'Enable SpotBugs analysis for Java (true/false)'
+    required: false
+    default: 'false'
+
+  - name: PMD_ENABLED
+    description: 'Enable PMD analysis for Java (true/false)'
+    required: false
+    default: 'false'
+
+  - name: WORKING_DIR
+    description: 'Working directory where analysis should be executed'
+    required: false
+    default: '.'
+
+  - name: DEBUG
+    description: 'Enable debug mode for verbose output (true/false)'
+    required: false
+    default: 'false'
+
+tags:
+  - code-quality
+  - sonarqube
+  - linting
+  - coverage
+  - static-analysis
+  - ci

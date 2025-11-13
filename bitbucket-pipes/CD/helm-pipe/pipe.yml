@@ -1,0 +1,62 @@
+name: Helm Chart Package and Push
+description: Lint, package, and push Helm charts to OCI or traditional registries
+repository: https://github.com/nayaksuraj/test-repo
+
+# Pipe metadata
+metadata:
+  type: cd
+  category: helm
+  vendor: nayaksuraj
+  version: 1.0.0
+
+# Variables that can be configured
+variables:
+  - name: HELM_CHART_PATH
+    description: Path to Helm chart directory
+    required: true
+    example: "./helm-chart"
+
+  - name: CHART_VERSION
+    description: Chart version (defaults to version in Chart.yaml)
+    required: false
+    example: "1.0.0"
+
+  - name: HELM_REGISTRY
+    description: Helm registry URL (OCI or traditional)
+    required: false
+    example: "oci://ghcr.io/myorg/charts"
+
+  - name: HELM_REGISTRY_USERNAME
+    description: Helm registry username
+    required: false
+    example: "myuser"
+
+  - name: HELM_REGISTRY_PASSWORD
+    description: Helm registry password/token
+    required: false
+    secured: true
+
+  - name: LINT_CHART
+    description: Run helm lint on chart
+    required: false
+    default: "true"
+
+  - name: PACKAGE_CHART
+    description: Package the Helm chart
+    required: false
+    default: "true"
+
+  - name: PUSH_CHART
+    description: Push chart to registry
+    required: false
+    default: "true"
+
+  - name: WORKING_DIR
+    description: Working directory
+    required: false
+    default: "."
+
+  - name: DEBUG
+    description: Enable debug output
+    required: false
+    default: "false"

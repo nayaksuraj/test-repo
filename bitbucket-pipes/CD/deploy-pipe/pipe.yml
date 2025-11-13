@@ -1,0 +1,67 @@
+name: Kubernetes Deployment
+description: Deploy applications to Kubernetes using Helm with support for dev/stage/prod environments
+repository: https://github.com/nayaksuraj/test-repo
+
+# Pipe metadata
+metadata:
+  type: cd
+  category: deployment
+  vendor: nayaksuraj
+  version: 1.0.0
+
+# Variables that can be configured
+variables:
+  - name: ENVIRONMENT
+    description: Target environment (dev, stage, prod)
+    required: true
+    example: "dev"
+
+  - name: NAMESPACE
+    description: Kubernetes namespace
+    required: true
+    example: "my-app-dev"
+
+  - name: KUBECONFIG
+    description: Base64-encoded kubeconfig file content
+    required: true
+    secured: true
+
+  - name: RELEASE_NAME
+    description: Helm release name
+    required: true
+    example: "my-app"
+
+  - name: HELM_CHART_PATH
+    description: Path to Helm chart or chart reference
+    required: true
+    example: "./helm-chart"
+
+  - name: VALUES_FILE
+    description: Path to values file (defaults to values-{ENVIRONMENT}.yaml)
+    required: false
+    example: "./helm-chart/values-dev.yaml"
+
+  - name: IMAGE_TAG
+    description: Docker image tag to deploy
+    required: false
+    example: "v1.0.0"
+
+  - name: WAIT_FOR_ROLLOUT
+    description: Wait for deployment rollout to complete
+    required: false
+    default: "true"
+
+  - name: ROLLOUT_TIMEOUT
+    description: Timeout for rollout (e.g., 5m, 10m)
+    required: false
+    default: "10m"
+
+  - name: DRY_RUN
+    description: Perform dry-run deployment (no actual changes)
+    required: false
+    default: "false"
+
+  - name: DEBUG
+    description: Enable debug output
+    required: false
+    default: "false"
