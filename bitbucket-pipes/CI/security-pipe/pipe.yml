@@ -1,0 +1,97 @@
+name: Security Pipe
+image: nayaksuraj/security-pipe:1.0.0
+description: Comprehensive security scanning pipe including secrets, SCA, SAST, SBOM, IaC, and Dockerfile scanning
+repository: https://github.com/nayaksuraj/test-repo
+
+variables:
+  - name: SECRETS_SCAN
+    description: 'Enable secrets scanning with GitLeaks (true/false)'
+    required: false
+    default: 'true'
+
+  - name: SCA_SCAN
+    description: 'Enable Software Composition Analysis - dependency scanning (true/false)'
+    required: false
+    default: 'true'
+
+  - name: SAST_SCAN
+    description: 'Enable Static Application Security Testing (true/false)'
+    required: false
+    default: 'false'
+
+  - name: SBOM_GENERATE
+    description: 'Generate Software Bill of Materials (true/false)'
+    required: false
+    default: 'true'
+
+  - name: IAC_SCAN
+    description: 'Enable Infrastructure as Code security scanning (true/false)'
+    required: false
+    default: 'false'
+
+  - name: DOCKERFILE_SCAN
+    description: 'Enable Dockerfile security scanning (true/false)'
+    required: false
+    default: 'false'
+
+  - name: CONTAINER_SCAN
+    description: 'Enable container image vulnerability scanning (true/false)'
+    required: false
+    default: 'false'
+
+  - name: CONTAINER_IMAGE
+    description: 'Container image to scan (required if CONTAINER_SCAN=true)'
+    required: false
+
+  - name: FAIL_ON_HIGH
+    description: 'Fail pipeline on HIGH severity issues (true/false)'
+    required: false
+    default: 'false'
+
+  - name: FAIL_ON_CRITICAL
+    description: 'Fail pipeline on CRITICAL severity issues (true/false)'
+    required: false
+    default: 'true'
+
+  - name: CVSS_THRESHOLD
+    description: 'CVSS threshold for SCA scanning (0-10)'
+    required: false
+    default: '7.0'
+
+  - name: HELM_CHART_PATH
+    description: 'Path to Helm chart for IaC scanning'
+    required: false
+    default: './helm-chart'
+
+  - name: DOCKERFILE_PATH
+    description: 'Path to Dockerfile for scanning'
+    required: false
+    default: './Dockerfile'
+
+  - name: WORKING_DIR
+    description: 'Working directory where scans should be executed'
+    required: false
+    default: '.'
+
+  - name: REPORTS_DIR
+    description: 'Directory to store security reports'
+    required: false
+    default: 'security-reports'
+
+  - name: DEBUG
+    description: 'Enable debug mode for verbose output (true/false)'
+    required: false
+    default: 'false'
+
+tags:
+  - security
+  - secrets-scanning
+  - dependency-scanning
+  - sca
+  - sast
+  - sbom
+  - iac-scanning
+  - dockerfile-scanning
+  - container-scanning
+  - shift-left
+  - devsecops

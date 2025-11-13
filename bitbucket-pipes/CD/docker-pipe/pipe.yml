@@ -1,0 +1,77 @@
+name: Docker Build and Push
+description: Build, scan, and push Docker images with Trivy security scanning
+repository: https://github.com/nayaksuraj/test-repo
+
+# Pipe metadata
+metadata:
+  type: cd
+  category: docker
+  vendor: nayaksuraj
+  version: 1.0.0
+
+# Variables that can be configured
+variables:
+  - name: DOCKER_REGISTRY
+    description: Docker registry URL (e.g., docker.io, ghcr.io, your-registry.example.com)
+    required: true
+    example: "docker.io"
+
+  - name: DOCKER_REPOSITORY
+    description: Docker repository name (e.g., username/app-name)
+    required: true
+    example: "mycompany/myapp"
+
+  - name: DOCKER_USERNAME
+    description: Docker registry username
+    required: false
+    example: "myuser"
+
+  - name: DOCKER_PASSWORD
+    description: Docker registry password/token
+    required: false
+    secured: true
+
+  - name: IMAGE_TAG
+    description: Docker image tag (defaults to git commit SHA)
+    required: false
+    example: "latest"
+
+  - name: DOCKERFILE_PATH
+    description: Path to Dockerfile
+    required: false
+    default: "./Dockerfile"
+
+  - name: BUILD_ARGS
+    description: Docker build arguments (comma-separated, e.g., "VERSION=1.0.0,ENV=prod")
+    required: false
+    example: "VERSION=1.0.0,BUILD_DATE=2024-01-01"
+
+  - name: SCAN_IMAGE
+    description: Enable Trivy vulnerability scanning
+    required: false
+    default: "true"
+
+  - name: TRIVY_SEVERITY
+    description: Trivy severity levels to scan for
+    required: false
+    default: "CRITICAL,HIGH,MEDIUM"
+
+  - name: TRIVY_EXIT_CODE
+    description: Exit code when vulnerabilities are found (0=continue, 1=fail)
+    required: false
+    default: "0"
+
+  - name: PUSH_IMAGE
+    description: Push image to registry after build
+    required: false
+    default: "true"
+
+  - name: WORKING_DIR
+    description: Working directory for build
+    required: false
+    default: "."
+
+  - name: DEBUG
+    description: Enable debug output
+    required: false
+    default: "false"
