@@ -56,11 +56,9 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/build-pipe:1.0.0
           variables:
-            BUILD_TOOL: "maven"
             BUILD_ARGS: "-DskipTests -T 2C"
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_TOOL: "maven"
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"
 

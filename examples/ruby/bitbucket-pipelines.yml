@@ -84,12 +84,9 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/build-pipe:1.0.0
           variables:
-            BUILD_TOOL: "ruby"
             BUILD_ARGS: "--jobs=4"
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_TOOL: "ruby"
-            TEST_COMMAND: "bundle exec rspec"
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"
 

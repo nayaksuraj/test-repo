@@ -80,11 +80,9 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/build-pipe:1.0.0
           variables:
-            BUILD_TOOL: "dotnet"
             BUILD_ARGS: "--configuration Release"
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_TOOL: "dotnet"
             TEST_ARGS: "--configuration Release --no-build"
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"

@@ -24,13 +24,10 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/build-pipe:1.0.0
           variables:
-            BUILD_TOOL: "go"
             BUILD_COMMAND: "go build -v ./..."
 
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_TOOL: "go"
-            TEST_COMMAND: "go test -v -race -coverprofile=coverage.out -covermode=atomic ./..."
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"
 
@@ -197,13 +194,10 @@ pipelines:
     '**':
       - pipe: docker://nayaksuraj/build-pipe:1.0.0
         variables:
-          BUILD_TOOL: "go"
 
       - parallel:
           - pipe: docker://nayaksuraj/test-pipe:1.0.0
             variables:
-              TEST_TOOL: "go"
-              TEST_COMMAND: "go test -v -race ./..."
 
           - pipe: docker://nayaksuraj/security-pipe:1.0.0
             variables:

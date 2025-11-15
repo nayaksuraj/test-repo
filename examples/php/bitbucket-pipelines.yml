@@ -85,12 +85,9 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/build-pipe:1.0.0
           variables:
-            BUILD_TOOL: "php"
             BUILD_ARGS: "--no-interaction --optimize-autoloader"
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_TOOL: "php"
-            TEST_COMMAND: "vendor/bin/phpunit"
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"
 

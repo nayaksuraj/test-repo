@@ -25,8 +25,8 @@ pipelines:
           TYPE_CHECK_ENABLED: "true"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
-          TEST_TOOL: "pytest"
           COVERAGE_ENABLED: "true"
 
       - parallel:
@@ -51,8 +51,8 @@ pipelines:
           # Auto-detects Python - no LANGUAGE variable needed!
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
-          TEST_TOOL: "pytest"
           COVERAGE_ENABLED: "true"
 
       - parallel:
@@ -99,8 +99,8 @@ pipelines:
           TYPE_CHECK_COMMAND: "poetry run mypy src --strict"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
-          TEST_TOOL: "pytest"
           COVERAGE_ENABLED: "true"
 
       - parallel:
@@ -163,8 +163,8 @@ pipelines:
           TYPE_CHECK_COMMAND: "poetry run mypy src --strict --disallow-untyped-defs"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
-          TEST_TOOL: "pytest"
           COVERAGE_ENABLED: "true"
 
       - pipe: docker://nayaksuraj/security-pipe:1.0.0
