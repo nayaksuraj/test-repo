@@ -1,62 +1,94 @@
 # Truly Reusable Bitbucket Pipelines - Import, Don't Copy!
 
-**ZERO code duplication** • **Instant updates** • **100% consistency** • **Single source of truth**
+**100% Language-Agnostic** • **ZERO code duplication** • **Instant updates** • **Auto-detection**
 
-A production-ready Bitbucket Pipeline ecosystem using **Bitbucket Pipes** - organizational Docker-based components that projects IMPORT instead of copying. No more 500-line YAML files to maintain!
+A production-ready Bitbucket Pipeline ecosystem using **Bitbucket Pipes** - organizational Docker-based components that **AUTO-DETECT your language** and work with Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET - all with the SAME pipeline!
+
+## 🌟 TRUE Language-Agnosticism
+
+**The SAME pipeline works for ALL languages** - no configuration changes needed!
+
+```yaml
+# This EXACT pipeline works for Python, Java, Node.js, Go, Rust, etc.!
+pipelines:
+  default:
+    - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+      # Auto-detects: Python, JavaScript, TypeScript, Go, Java, Rust, Ruby, PHP
+
+    - pipe: docker://nayaksuraj/test-pipe:1.0.0
+      # Auto-detects: pytest, jest, JUnit, go test, cargo, etc.
+
+    - pipe: docker://nayaksuraj/build-pipe:1.0.0
+      # Auto-detects: Maven, Gradle, npm, poetry, go, cargo, dotnet
+
+    - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+      # Works with ANY Dockerfile
+```
+
+**No LANGUAGE variable. No BUILD_TOOL variable. No TEST_TOOL variable. Just works!**
 
 ## 🎯 The Problem We Solve
 
 **Traditional Approach (❌ NOT REUSABLE)**:
 - Each project copies 500+ lines of pipeline YAML
+- Different pipelines for each language (Python, Java, Node.js)
 - Manual sync required when template updates
 - Duplicated across 50+ projects
 - Update propagation: 2-4 weeks
-- Consistency: ~60%
 
-**Our Approach (✅ TRULY REUSABLE)**:
+**Our Approach (✅ TRULY REUSABLE & AGNOSTIC)**:
 - Projects have 50-line minimal YAML (just pipe imports)
+- ONE pipeline works for ALL languages (auto-detection!)
 - Updates = change pipe version (instant!)
 - Zero duplication - pipes are shared
 - Update propagation: Instant
-- Consistency: 100%
 
 ## 📋 What You Get
 
-1. **9 Organizational Pipes** - Complete CI/CD coverage (lint, test, build, quality, security, docker, helm, deploy, notify)
-2. **Minimal Pipeline Examples** - 50-line YAML that imports pipes (Python, JS/TS, Go, Java)
+1. **9 Language-Agnostic Pipes** - Work with Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET
+   - lint-pipe (pre-commit, linting, type checking)
+   - test-pipe (all test frameworks)
+   - build-pipe (all build tools)
+   - quality-pipe (SonarQube - all languages)
+   - security-pipe (secrets, SCA, SAST - all languages)
+   - docker-pipe (any Dockerfile)
+   - helm-pipe (any Helm chart)
+   - deploy-pipe (any Kubernetes app)
+   - slack-pipe (any project)
+
+2. **Universal Pipeline Example** - Works for ANY language without changes
 3. **Generic Helm Chart** - Reusable Kubernetes deployment chart
-4. **Complete Documentation** - [REUSABLE-PIPELINES.md](./REUSABLE-PIPELINES.md) - comprehensive reusability guide
+4. **Complete Documentation** - [REUSABLE-PIPELINES.md](./REUSABLE-PIPELINES.md)
 
-## 🚀 Quick Start (Truly Reusable Way)
+## 🚀 Quick Start (Works for ANY Language!)
 
-### For Python Projects (50 lines, not 500!)
+### Universal Pipeline (Python, Java, Node.js, Go, etc.)
 
 Create `bitbucket-pipelines.yml`:
 
 ```yaml
-# Minimal Reusable Python Pipeline
-# Updates = just change pipe versions!
+# Universal Pipeline - Works with ANY language!
+# Auto-detects Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET
 
-image: python:3.11-slim
+image: atlassian/default-image:4
 
 pipelines:
   pull-requests:
     '**':
+      # Auto-detects your language and tools!
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
-        variables:
-          LANGUAGE: "python"
-
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
         variables:
           COVERAGE_ENABLED: "true"
-
       - pipe: docker://nayaksuraj/security-pipe:1.0.0
         variables:
           SECRETS_SCAN: "true"
 
   branches:
     develop:
+      # Auto-detects everything!
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+      - pipe: docker://nayaksuraj/build-pipe:1.0.0
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
       - pipe: docker://nayaksuraj/docker-pipe:1.0.0
         variables:
@@ -74,7 +106,9 @@ pipelines:
           MESSAGE: "✅ Deployed to DEV"
 ```
 
-**That's it!** Just configure Bitbucket repository variables and you're done. See [REUSABLE-PIPELINES.md](./REUSABLE-PIPELINES.md) for complete guide.
+**That's it! This SAME pipeline works for Python, Java, Node.js, Go, and more!**
+
+See [REUSABLE-PIPELINES.md](./REUSABLE-PIPELINES.md) for complete guide.
 
 ### Configure Variables (Not Code!)
 

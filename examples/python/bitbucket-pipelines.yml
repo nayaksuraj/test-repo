@@ -18,7 +18,7 @@ pipelines:
     '**':
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          LANGUAGE: "python"
+          # Auto-detects Python - no LANGUAGE variable needed!
           PRE_COMMIT_ENABLED: "true"
           LOCKFILE_CHECK: "true"
           LINT_ENABLED: "true"
@@ -48,7 +48,7 @@ pipelines:
     develop:
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          LANGUAGE: "python"
+          # Auto-detects Python - no LANGUAGE variable needed!
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
         variables:
@@ -95,7 +95,7 @@ pipelines:
     main:
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          LANGUAGE: "python"
+          # Auto-detects Python - no LANGUAGE variable needed!
           TYPE_CHECK_COMMAND: "poetry run mypy src --strict"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
@@ -159,7 +159,7 @@ pipelines:
     'v*':
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          LANGUAGE: "python"
+          # Auto-detects Python - no LANGUAGE variable needed!
           TYPE_CHECK_COMMAND: "poetry run mypy src --strict --disallow-untyped-defs"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
