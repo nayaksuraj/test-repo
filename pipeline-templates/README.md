@@ -20,7 +20,34 @@ This directory contains production-ready, language-specific CI/CD pipeline templ
 
 ### How to Use These Templates in Your Repository
 
-**Step 1**: Copy the template for your language from nayaksuraj/test-repo
+**Method 1: Import via !include (Recommended)**
+
+Create `bitbucket-pipelines.yml` in your repository:
+
+```yaml
+# Import Python template from nayaksuraj/test-repo
+resources:
+  repositories:
+    pipeline-templates:
+      git: git@bitbucket.org:nayaksuraj/test-repo.git
+
+!include:
+  - pipeline-templates:pipeline-templates/python-template.yml
+```
+
+For other languages, change the template path:
+- Java Maven: `pipeline-templates/java-maven-template.yml`
+- Java Gradle: `pipeline-templates/java-gradle-template.yml`
+- Node.js: `pipeline-templates/nodejs-template.yml`
+- Go: `pipeline-templates/golang-template.yml`
+- .NET: `pipeline-templates/dotnet-template.yml`
+- Rust: `pipeline-templates/rust-template.yml`
+- Ruby: `pipeline-templates/ruby-template.yml`
+- PHP: `pipeline-templates/php-template.yml`
+
+**Method 2: Copy Template Directly**
+
+If you prefer standalone pipelines:
 
 ```bash
 # For Python projects
@@ -28,40 +55,44 @@ curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/m
 
 # For Java Maven projects
 curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/java-maven-template.yml
-
-# Or manually copy from: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/
 ```
 
-**Step 2**: Configure required Bitbucket variables in your repository
+**Configure Bitbucket Variables**
 
-```
-Repository Settings → Pipelines → Repository variables
-```
+Go to: **Repository Settings → Pipelines → Repository variables**
 
-Add these variables (see template comments for complete list):
+Add these variables (mark secured ones):
 - `DOCKER_REGISTRY`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` (secured)
 - `KUBECONFIG_DEV`, `KUBECONFIG_STAGING`, `KUBECONFIG_PRODUCTION` (secured)
 - `SLACK_WEBHOOK_URL` (secured)
 - `SONAR_TOKEN` (secured, optional)
 
-**Step 3**: Commit and push
+**Commit and Push**
 
 ```bash
 git add bitbucket-pipelines.yml
-git commit -m "Add CI/CD pipeline from nayaksuraj/test-repo"
+git commit -m "Add CI/CD pipeline using nayaksuraj/test-repo templates"
 git push
 ```
 
-Your pipeline will automatically run on the next push!
+Your pipeline will automatically run!
 
-### Alternative: Organization Template Repository
+### Organization Template Repository
 
-For organizations, you can fork this repository and customize templates for your needs:
+Fork this repository to customize templates for your organization:
 
 ```bash
 # Fork nayaksuraj/test-repo to yourorg/pipeline-templates
 # Customize templates with org-specific defaults
-# Teams copy templates from yourorg/pipeline-templates
+
+# Teams import from your fork:
+resources:
+  repositories:
+    pipeline-templates:
+      git: git@bitbucket.org:yourorg/pipeline-templates.git
+
+!include:
+  - pipeline-templates:pipeline-templates/python-template.yml
 ```
 
 ## 🔧 Configuration
