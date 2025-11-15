@@ -244,9 +244,10 @@ pipelines:
       - step:
           name: 📢 Notify Success
           script:
-            - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
               # Works for ANY project
               variables:
+                CHANNELS: "slack"
                 SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
                 MESSAGE: "✅ Deployed to DEV"
                 ENVIRONMENT: "dev"
@@ -400,8 +401,9 @@ pipelines:
       - step:
           name: 📢 Notify Success
           script:
-            - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
               variables:
+                CHANNELS: "slack"
                 SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
                 MESSAGE: "✅ Deployed to STAGING"
                 ENVIRONMENT: "staging"
@@ -550,8 +552,9 @@ pipelines:
       - step:
           name: 📢 Notify Production Release
           script:
-            - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
               variables:
+                CHANNELS: "slack"
                 SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
                 MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
                 ENVIRONMENT: "production"
@@ -613,8 +616,9 @@ pipelines:
       - step:
           name: 📢 Notify Rollback
           script:
-            - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
               variables:
+                CHANNELS: "slack"
                 SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
                 MESSAGE: "⚠️ Production rolled back"
                 ENVIRONMENT: "production"

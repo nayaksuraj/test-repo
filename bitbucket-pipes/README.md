@@ -27,6 +27,7 @@ Production-ready, reusable Bitbucket Pipes for building, testing, securing, and 
 | Pipe | Purpose | Version | Status |
 |------|---------|---------|--------|
 | [slack-pipe](./slack-pipe/) | Send rich Slack notifications with deployment status | 1.0.0 | ✅ Ready |
+| [notify-pipe](./notify-pipe/) | Universal notifications (Slack, Email, Teams, Discord, Webhooks) | 1.0.0 | ✅ Ready |
 
 ## 🚀 Quick Start
 
@@ -273,7 +274,7 @@ All pipes include:
 
 ## 📊 Statistics
 
-- **Total Pipes**: 7 (4 CI + 3 CD)
+- **Total Pipes**: 9 (4 CI + 3 CD + 2 Notify)
 - **Total Lines of Code**: ~4,500 lines
 - **Total Documentation**: ~3,500 lines
 - **Supported Languages**: 10+ (Java, Node.js, Python, Go, .NET, Rust, Ruby, PHP, etc.)

@@ -82,8 +82,9 @@ pipelines:
           HELM_CHART_PATH: "../../helm-chart"
           HELM_VALUES_FILE: "helm-values-dev.yaml"
 
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
+          CHANNELS: "slack"
           SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
           MESSAGE: "✅ Deployed to DEV"
           ENVIRONMENT: "dev"
@@ -144,8 +145,9 @@ pipelines:
                 HELM_CHART_PATH: "../../helm-chart"
                 HELM_VALUES_FILE: "helm-values-staging.yaml"
 
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
+          CHANNELS: "slack"
           SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
           MESSAGE: "✅ Deployed to STAGING"
           ENVIRONMENT: "staging"
@@ -207,8 +209,9 @@ pipelines:
                 HELM_VALUES_FILE: "helm-values-production.yaml"
                 DEPLOYMENT_STRATEGY: "canary"
 
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
+          CHANNELS: "slack"
           SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
           MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
           ENVIRONMENT: "production"

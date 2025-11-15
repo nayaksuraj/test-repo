@@ -50,7 +50,7 @@ pipelines:
 
 ## 📋 What You Get
 
-1. **9 Language-Agnostic Pipes** - Work with Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET
+1. **10 Language-Agnostic Pipes** - Work with Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET
    - lint-pipe (pre-commit, linting, type checking)
    - test-pipe (all test frameworks)
    - build-pipe (all build tools)
@@ -59,7 +59,7 @@ pipelines:
    - docker-pipe (any Dockerfile)
    - helm-pipe (any Helm chart)
    - deploy-pipe (any Kubernetes app)
-   - slack-pipe (any project)
+   - notify-pipe (Slack, Email, Teams, Discord, Webhooks)
 
 2. **Universal Pipeline Example** - Works for ANY language without changes
 3. **Generic Helm Chart** - Reusable Kubernetes deployment chart
@@ -105,8 +105,9 @@ pipelines:
         variables:
           ENVIRONMENT: "dev"
           KUBECONFIG: $KUBECONFIG_DEV
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
+          CHANNELS: "slack"
           SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
           MESSAGE: "✅ Deployed to DEV"
 ```
@@ -240,7 +241,7 @@ HELM_REGISTRY_PASSWORD   # Registry password/token (use secured variables)
 The pipeline supports integration with enterprise monitoring and observability platforms:
 
 #### Supported Integrations
-- **Slack**: Real-time deployment notifications (built-in via slack-pipe)
+- **Slack**: Real-time deployment notifications (built-in via notify-pipe)
 - **Datadog**: APM, metrics, and deployment tracking
 - **New Relic**: Application performance monitoring
 - **PagerDuty**: Incident management and on-call alerts
@@ -488,6 +489,7 @@ Compared to traditional script-based pipelines:
 - **[ROLLBACK-PROCEDURES.md](ROLLBACK-PROCEDURES.md)** - Emergency rollback procedures and troubleshooting
 - **[HELM-REGISTRY-SETUP.md](HELM-REGISTRY-SETUP.md)** - Setup Helm chart registries (GHCR, ECR, ACR, GAR, Harbor)
 - **[helm-chart/README.md](helm-chart/README.md)** - Helm chart documentation and customization
+- **[bitbucket-pipes/notify-pipe/README.md](bitbucket-pipes/notify-pipe/README.md)** - Universal notifications (Slack, Email, Teams, Discord, Webhooks)
 
 ## 🎯 Quick Start with Examples
 
