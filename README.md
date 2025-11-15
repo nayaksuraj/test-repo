@@ -174,11 +174,13 @@ SONAR_HOST_URL           # SonarQube server URL
 │   ├── values-prod.yaml                 # Production values
 │   └── templates/                       # Kubernetes manifests
 │
-├── scripts/                             # Legacy scripts (removed - see MIGRATION_GUIDE.md)
-│   └── README.md                        # Documentation for reference
+├── src/                                 # Example Java Spring Boot application
+│   ├── main/                            # Application source code
+│   └── test/                            # Test source code
 │
-├── Dockerfile                           # Example application container
-├── MIGRATION_GUIDE.md                   # Guide for adopting pipes
+├── pom.xml                              # Example Maven build file
+├── Dockerfile                           # Example multi-stage container build
+├── MIGRATION_GUIDE.md                   # Guide for adopting Bitbucket Pipes
 └── README.md                            # This file
 ```
 
@@ -323,7 +325,6 @@ Compared to traditional script-based pipelines:
 - **[bitbucket-pipes/README.md](bitbucket-pipes/README.md)** - Detailed documentation for all pipes
 - **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - How to adopt Bitbucket Pipes in your project
 - **[helm-chart/README.md](helm-chart/README.md)** - Helm chart documentation
-- **[scripts/README.md](scripts/README.md)** - Legacy approach reference (historical)
 
 ## 🎓 Examples
 

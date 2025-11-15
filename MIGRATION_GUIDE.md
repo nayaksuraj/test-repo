@@ -1,6 +1,8 @@
 # Migration Guide: Scripts to Bitbucket Pipes
 
-This guide helps you migrate from the traditional script-based approach (`scripts/`) to the newer Bitbucket Pipes approach (`bitbucket-pipes/`).
+> **Note**: This repository has fully migrated to Bitbucket Pipes (all scripts removed). This guide is provided to help teams migrate their **own** script-based pipelines to the pipes approach.
+
+This guide helps you migrate from a traditional script-based CI/CD approach to the modern Bitbucket Pipes approach.
 
 ## Why Migrate?
 
