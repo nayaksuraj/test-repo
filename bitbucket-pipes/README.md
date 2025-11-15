@@ -75,8 +75,9 @@ pipelines:
         KUBECONFIG: $KUBECONFIG
 
     # Notify - Slack notification
-    - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+    - pipe: docker://nayaksuraj/notify-pipe:1.0.0
       variables:
+        CHANNELS: "slack"
         SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
         MESSAGE: "✅ Deployed to dev successfully"
         ENVIRONMENT: "dev"

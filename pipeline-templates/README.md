@@ -210,7 +210,7 @@ definitions:
     cosign-sign-sbom: &cosign-sign-sbom # Image signing (not yet in pipes)
     helm-package: &helm-package         # ✅ Uses helm-pipe
     deploy: &deploy                     # ✅ Uses deploy-pipe
-    notify: &notify                     # ✅ Uses slack-pipe
+    notify: &notify                     # ✅ Uses notify-pipe
 
 # 3. Pipeline Definitions
 pipelines:
@@ -234,7 +234,7 @@ Templates leverage organizational **Bitbucket Pipes** to eliminate duplicate cod
 | **docker-build** | `docker-pipe:1.0.0` | Docker build + Trivy scan + push | Manual Docker commands, Trivy installation |
 | **helm-package** | `helm-pipe:1.0.0` | Helm lint, package, push | Manual Helm commands |
 | **deploy** | `deploy-pipe:1.0.0` | Kubernetes deployment | Manual kubectl/helm deploy logic |
-| **notify** | `slack-pipe:1.0.0` | Rich Slack notifications | Manual curl/JSON formatting |
+| **notify** | `notify-pipe:1.0.0` | Rich Slack notifications | Manual curl/JSON formatting |
 
 **Benefits**:
 - ✅ **No duplicate tool installation** - pipes have tools pre-installed
