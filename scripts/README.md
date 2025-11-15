@@ -1,4 +1,6 @@
-# Build Scripts
+# Build Scripts (Legacy Approach)
+
+> **📢 Note**: This is the **traditional script-based approach**. For new projects, consider using the newer **Bitbucket Pipes** approach located in `bitbucket-pipes/` directory, which provides better modularity, versioning, and reusability. See [MIGRATION_GUIDE.md](../MIGRATION_GUIDE.md) for migration instructions.
 
 This folder contains scripts used by the Bitbucket Pipeline for CI/CD automation. By using scripts instead of hardcoded commands, you have full control over your build, test, and deployment processes regardless of programming language or framework.
 
@@ -9,11 +11,17 @@ The pipeline calls these scripts at different stages:
 | Script | Purpose | Called By |
 |--------|---------|-----------|
 | `build.sh` | Build your application | Build and Test step |
-| `test.sh` | Run tests | Build and Test step |
+| `test.sh` | Run unit tests | Unit Test step |
+| `integration-test.sh` | Run integration tests | Integration Test step |
 | `package.sh` | Package application for deployment | Build and Test step |
-| `deploy-staging.sh` | Deploy to staging environment | Staging deployment step |
-| `deploy-production.sh` | Deploy to production environment | Production deployment step |
-| `quality.sh` | (Optional) Code quality checks | Code Quality step |
+| `docker-build.sh` | Build and push Docker images | Docker Build step |
+| `docker-scan.sh` | Scan Docker images for vulnerabilities | Security Scan step |
+| `helm-package.sh` | Package and push Helm charts | Helm Package step |
+| `deploy-dev.sh` | Deploy to development environment | Development deployment step |
+| `deploy-stage.sh` | Deploy to staging environment | Staging deployment step |
+| `deploy-prod.sh` | Deploy to production environment | Production deployment step |
+| `quality.sh` | Code quality checks (SonarQube) | Code Quality step |
+| `security-*.sh` | Security scanning scripts | Security steps |
 
 ## Getting Started
 
@@ -121,46 +129,43 @@ if [ -f "Dockerfile" ]; then
 fi
 ```
 
-### deploy-staging.sh
+### deploy-stage.sh
 
-**Purpose**: Deploy to your staging/QA environment.
+**Purpose**: Deploy to your staging/QA environment using Helm and Kubernetes.
 
-**When it runs**: After packaging (on main/master branches)
+**When it runs**: After packaging (manual trigger on main/release branches)
 
-**Common deployment methods included**:
-- SSH/SCP deployment
-- Docker deployment
-- Kubernetes deployment
-- AWS S3/CloudFront
-- Heroku
-- Google Cloud Run
-- Azure Web Apps
+**Features**:
+- Kubernetes deployment via Helm
+- Smoke tests after deployment
+- Automatic rollback on failure
+- Blue-green deployment strategy
 
-**Example for Docker**:
-```bash
-docker push myregistry/myapp:staging
-ssh user@staging-server "docker pull myregistry/myapp:staging && docker restart myapp"
-```
+**Key configuration**:
+- Uses label selectors instead of hardcoded resource names
+- Requires `KUBECONFIG`, `NAMESPACE`, `RELEASE_NAME` variables
 
-### deploy-production.sh
+### deploy-prod.sh
 
-**Purpose**: Deploy to production environment.
+**Purpose**: Deploy to production environment with comprehensive safety checks.
 
 **When it runs**: Manual trigger or on version tags
 
-**Security note**: This requires manual approval in the pipeline
+**Security note**: Requires manual approval in the pipeline
 
-**Example with health checks**:
+**Features**:
+- Production deployment backup
+- Comprehensive smoke tests
+- Automatic rollback on failure
+- Canary deployment support (optional)
+- Extended timeouts for production stability
+
+**Safety features**:
 ```bash
-# Deploy
-scp target/*.jar user@prod:/app/
-
-# Restart service
-ssh user@prod "systemctl restart myapp"
-
-# Health check
-sleep 10
-curl -f https://myapp.com/health || exit 1
+# Manual confirmation (unless AUTO_APPROVE=true)
+# Deployment backup before changes
+# Health, liveness, readiness, metrics endpoint verification
+# Automatic rollback if any smoke test fails
 ```
 
 ### quality.sh (Optional)
@@ -298,8 +303,22 @@ Reorder the detection logic or be more specific in your conditions.
    ```
 7. **Commit and push** - Pipeline will use your scripts!
 
+## Comparison: Scripts vs Pipes
+
+| Feature | Scripts (This Directory) | Bitbucket Pipes (Recommended) |
+|---------|-------------------------|--------------------------------|
+| **Modularity** | ❌ Scripts specific to this repo | ✅ Versioned, reusable across projects |
+| **Language Support** | ⚠️ Manual modification needed | ✅ Auto-detection for 10+ languages |
+| **Maintenance** | ⚠️ Copy to each project | ✅ Centralized, update once |
+| **Portability** | ❌ Tied to repository | ✅ Can be published/shared |
+| **Debugging** | ✅ Easy to test locally | ⚠️ Requires Docker |
+| **Best For** | Existing projects, simple needs | New projects, multi-project teams |
+
+**Recommendation**: For new projects, use Bitbucket Pipes. See [../bitbucket-pipes/README.md](../bitbucket-pipes/README.md) for details.
+
 ## Need Help?
 
-- Check the main [PIPELINE_REUSE_GUIDE.md](../PIPELINE_REUSE_GUIDE.md)
-- View [bitbucket-pipelines.yml](../bitbucket-pipelines.yml) configuration
-- Bitbucket Pipelines documentation: https://support.atlassian.com/bitbucket-cloud/docs/get-started-with-bitbucket-pipelines/
+- 📖 [Main README](../README.md) - Repository overview
+- 🚀 [Bitbucket Pipes Documentation](../bitbucket-pipes/README.md) - Recommended approach
+- 🔄 [Migration Guide](../MIGRATION_GUIDE.md) - Migrate from scripts to pipes
+- 📘 [Bitbucket Pipelines Docs](https://support.atlassian.com/bitbucket-cloud/docs/get-started-with-bitbucket-pipelines/)
