@@ -184,6 +184,7 @@ The templates themselves use **organizational Bitbucket Pipes** to avoid duplica
 
 | Template Step | Uses Pipe | Eliminates |
 |---------------|-----------|------------|
+| Lint Check | `lint-pipe:1.0.0` | Repeated pip/poetry/pre-commit installation in pre-checks and type-check steps |
 | Quality Scan | `quality-pipe:1.0.0` | SonarQube scanner installation/configuration |
 | Security Scan | `security-pipe:1.0.0` | Installation of secrets scanner, SCA tools, SAST tools |
 | Docker Build | `docker-pipe:1.0.0` | Docker build logic, Trivy installation/scan, registry push |

@@ -1,0 +1,99 @@
+name: Lint and Type Check
+description: Run pre-commit hooks, linting, formatting checks, and type checking for multiple languages
+repository: https://github.com/nayaksuraj/test-repo
+
+# Pipe metadata
+metadata:
+  type: ci
+  category: quality
+  vendor: nayaksuraj
+  version: 1.0.0
+
+# Variables that can be configured
+variables:
+  - name: LANGUAGE
+    description: Programming language (python, javascript, typescript, go, java, auto)
+    required: false
+    default: "auto"
+    example: "python"
+
+  - name: PRE_COMMIT_ENABLED
+    description: Run pre-commit hooks
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: PRE_COMMIT_CONFIG
+    description: Path to pre-commit config file
+    required: false
+    default: ".pre-commit-config.yaml"
+
+  - name: LOCKFILE_CHECK
+    description: Check dependency lockfile integrity (poetry.lock, package-lock.json, go.sum, etc.)
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: LINT_ENABLED
+    description: Run linting checks
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: LINT_COMMAND
+    description: Custom lint command (overrides auto-detection)
+    required: false
+    example: "poetry run ruff check . --select=F,E"
+
+  - name: TYPE_CHECK_ENABLED
+    description: Run type checking
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: TYPE_CHECK_COMMAND
+    description: Custom type check command (overrides auto-detection)
+    required: false
+    example: "poetry run mypy src --strict"
+
+  - name: FORMAT_CHECK_ENABLED
+    description: Check code formatting (without fixing)
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: FORMAT_CHECK_COMMAND
+    description: Custom format check command
+    required: false
+    example: "poetry run black --check ."
+
+  - name: FAIL_ON_ERROR
+    description: Fail pipeline if linting/type errors found
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: WORKING_DIR
+    description: Working directory for checks
+    required: false
+    default: "."
+
+  - name: PYTHON_VERSION
+    description: Python version for Python projects
+    required: false
+    default: "3.11"
+
+  - name: NODE_VERSION
+    description: Node.js version for JavaScript/TypeScript projects
+    required: false
+    default: "18"
+
+  - name: POETRY_VERSION
+    description: Poetry version for Python projects
+    required: false
+    default: "latest"
+
+  - name: DEBUG
+    description: Enable debug output
+    required: false
+    default: "false"
