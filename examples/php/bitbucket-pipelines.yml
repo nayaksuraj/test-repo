@@ -1,16 +1,14 @@
 # ==============================================================================
-# Production-Ready PHP Pipeline
+# PHP Project - Using Template from nayaksuraj/test-repo
 # ==============================================================================
-# Based on Laravel, Symfony, and WordPress.com best practices for PHP CI/CD
-# Features:
-# - Composer dependency management
-# - PHPUnit parallel test execution
-# - PHPStan/Psalm static analysis
-# - PHPCS code standards
-# - Laravel/Symfony optimizations
-# - Security scanning
-# - Docker multi-stage builds
-# - Kubernetes deployment
+# This pipeline uses the PHP template from nayaksuraj/test-repo
+#
+# To use this template in your repository:
+# 1. Copy pipeline-templates/php-template.yml from nayaksuraj/test-repo
+# 2. Paste as bitbucket-pipelines.yml in your repo
+# 3. Configure required Bitbucket variables (see template file)
+#
+# Template source: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/php-template.yml
 # ==============================================================================
 
 image: php:8.3-cli

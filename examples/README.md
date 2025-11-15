@@ -1,20 +1,20 @@
-# Production-Ready Pipeline Examples
+# Pipeline Examples - Using Templates from nayaksuraj/test-repo
 
-Battle-tested, production-ready CI/CD pipeline examples for all supported languages, based on best practices from leading tech companies.
+These examples demonstrate how to use production-ready CI/CD pipeline templates from **nayaksuraj/test-repo** in your projects. Each example shows the recommended way to import and configure language-specific templates.
 
 ## Available Examples
 
-| Language | Example | Based On | Key Features |
-|----------|---------|----------|--------------|
-| **Java** | [Maven](./java-maven/) | Netflix, Amazon, Google | Multi-module, JaCoCo, SonarQube, parallel tests |
-| **Java** | [Gradle](./java-gradle/) | LinkedIn, Netflix | Kotlin DSL, build cache, parallel execution |
-| **Node.js** | [npm/yarn](./nodejs/) | Airbnb, Uber, PayPal | ESLint, Jest, E2E tests, bundle analysis |
-| **Python** | [Poetry/pip](./python/) | Instagram, Spotify, Dropbox | pytest, mypy, ruff, multi-version testing |
-| **Go** | [Modules](./golang/) | Google, Uber, HashiCorp | Race detection, benchmarks, cross-compilation |
-| **.NET** | [Core](./dotnet/) | Microsoft, Stack Overflow | Multi-target, NuGet, xUnit |
-| **Rust** | [Cargo](./rust/) | Mozilla, Cloudflare | Clippy, cargo-audit, minimal images |
-| **Ruby** | [Bundler](./ruby/) | GitHub, Shopify | RSpec, Rubocop, parallel tests |
-| **PHP** | [Composer](./php/) | Laravel, Symfony | PHPUnit, PHPCS, Psalm |
+| Language | Example Directory | Template Used | Features |
+|----------|-------------------|---------------|----------|
+| **Python** | [python/](./python/) | `python-template.yml` | pytest, mypy, ruff, coverage |
+| **Java** | [java-maven/](./java-maven/) | `java-maven-template.yml` | Multi-module, JaCoCo, SonarQube |
+| **Java** | [java-gradle/](./java-gradle/) | `java-gradle-template.yml` | Kotlin DSL, build cache, parallel execution |
+| **Node.js** | [nodejs/](./nodejs/) | `nodejs-template.yml` | ESLint, Jest, bundle analysis |
+| **Go** | [golang/](./golang/) | `golang-template.yml` | Race detection, benchmarks |
+| **.NET** | [dotnet/](./dotnet/) | `dotnet-template.yml` | Multi-target, NuGet, xUnit |
+| **Rust** | [rust/](./rust/) | `rust-template.yml` | Clippy, cargo-audit |
+| **Ruby** | [ruby/](./ruby/) | `ruby-template.yml` | RSpec, Rubocop |
+| **PHP** | [php/](./php/) | `php-template.yml` | PHPUnit, PHPCS, Psalm |
 
 ## Common Patterns
 
@@ -59,14 +59,89 @@ Deploy to Production (manual with extended timeout)
 
 ## Getting Started
 
-1. **Choose your language** from the examples above
-2. **Copy the example** to your repository root:
-   ```bash
-   cp examples/java-maven/bitbucket-pipelines.yml ./
-   ```
-3. **Configure variables** in Bitbucket Repository Settings
-4. **Customize** the pipeline for your specific needs
-5. **Push** and watch the pipeline run!
+### How to Use Templates in Your Repository
+
+**Step 1**: Copy the template for your language from nayaksuraj/test-repo
+
+```bash
+# For Python projects
+curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/python-template.yml
+
+# For Java Maven projects
+curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/java-maven-template.yml
+
+# For Node.js projects
+curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/nodejs-template.yml
+
+# Or browse all templates: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/
+```
+
+**Step 2**: Configure required Bitbucket variables
+
+Go to: **Repository Settings → Pipelines → Repository variables**
+
+Add these variables (mark secured ones):
+- `DOCKER_REGISTRY`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` (secured)
+- `KUBECONFIG_DEV`, `KUBECONFIG_STAGING`, `KUBECONFIG_PRODUCTION` (secured)
+- `SLACK_WEBHOOK_URL` (secured)
+- `SONAR_TOKEN` (secured, optional)
+
+**Step 3**: Commit and push
+
+```bash
+git add bitbucket-pipelines.yml
+git commit -m "Add CI/CD pipeline from nayaksuraj/test-repo"
+git push
+```
+
+Your pipeline will run automatically!
+
+### Exploring Examples
+
+Each example directory shows how the template is used:
+
+```bash
+# View Python example
+cat examples/python/bitbucket-pipelines.yml
+
+# View Java Maven example
+cat examples/java-maven/bitbucket-pipelines.yml
+```
+
+All examples reference their source template in the header comments.
+
+## Why Use These Templates?
+
+### ✅ Zero Code Duplication
+All examples use **Bitbucket Pipes** from nayaksuraj/test-repo:
+- `lint-pipe` - Pre-commit, linting, type checking
+- `test-pipe` - Unit tests, coverage
+- `quality-pipe` - SonarQube/SonarCloud
+- `security-pipe` - Secrets, SCA, SAST, SBOM
+- `docker-pipe` - Build, scan, push
+- `helm-pipe` - Lint, package, push
+- `deploy-pipe` - Kubernetes deployments
+- `notify-pipe` - Slack, Email, Teams, Discord, Webhooks
+
+**No manual tool installation, no code duplication!**
+
+### ✅ Auto-Detection
+Templates automatically detect:
+- Programming language
+- Build system (Maven, Gradle, npm, Poetry, Cargo, etc.)
+- Test framework (JUnit, pytest, Jest, etc.)
+- Package managers and lockfiles
+
+**No need to specify language or tools!**
+
+### ✅ Production-Ready
+Based on best practices from:
+- Netflix, Amazon, Google (Java)
+- Airbnb, Uber, PayPal (Node.js)
+- Instagram, Spotify, Dropbox (Python)
+- And more...
+
+**Battle-tested patterns, ready to use!**
 
 ## Required Variables
 
