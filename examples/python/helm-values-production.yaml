@@ -1,0 +1,233 @@
+# Helm values for Python application - Production Environment
+# Usage: helm install myapp ../../helm-chart -f helm-values-production.yaml
+
+nameOverride: "python-app"
+fullnameOverride: "python-app-prod"
+
+replicaCount: 3
+
+image:
+  repository: myorg/python-app
+  pullPolicy: IfNotPresent
+  tag: ""  # Will be set by CI/CD pipeline (must be signed image)
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789:role/python-app-prod"
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+  # Cosign signature verification
+  cosign.sigstore.dev/verify: "true"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: python-app-prod-tls
+      hosts:
+        - api.example.com
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  # Custom metrics (optional)
+  # metrics:
+  #   - type: Pods
+  #     pods:
+  #       metric:
+  #         name: http_requests_per_second
+  #       target:
+  #         type: AverageValue
+  #         averageValue: 1000
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+# Production configuration
+env:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: LOG_LEVEL
+    value: "WARNING"
+  - name: WORKERS
+    value: "4"
+  - name: HOST
+    value: "0.0.0.0"
+  - name: PORT
+    value: "8000"
+  - name: GRACEFUL_TIMEOUT
+    value: "30"
+  - name: KEEP_ALIVE_TIMEOUT
+    value: "75"
+  - name: MAX_CONNECTIONS
+    value: "1000"
+
+configMap:
+  enabled: true
+  data:
+    app_config.yaml: |
+      environment: production
+      debug: false
+      log_level: WARNING
+      cors_origins:
+        - "https://example.com"
+        - "https://*.example.com"
+      database:
+        pool_size: 20
+        max_overflow: 40
+        pool_pre_ping: true
+        pool_recycle: 3600
+      cache:
+        enabled: true
+        ttl: 300
+      rate_limiting:
+        enabled: true
+        requests_per_minute: 100
+
+secrets:
+  enabled: true
+  data:
+    # All secrets should be base64 encoded
+    database-url: <base64-encoded-prod-db-url>
+    redis-url: <base64-encoded-redis-url>
+    api-key: <base64-encoded-prod-api-key>
+    jwt-secret: <base64-encoded-jwt-secret>
+
+persistence:
+  enabled: false
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2  # Always keep at least 2 pods running
+
+affinity:
+  podAntiAffinity:
+    # Hard requirement: don't schedule on same node
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - python-app
+        topologyKey: kubernetes.io/hostname
+  # Prefer different availability zones
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: topology.kubernetes.io/zone
+              operator: In
+              values:
+                - us-east-1a
+                - us-east-1b
+                - us-east-1c
+
+# Node selector for production workloads
+nodeSelector:
+  workload-type: "production"
+  # kubernetes.io/arch: amd64
+
+# Tolerations for production nodes
+tolerations:
+  - key: "production"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+# Canary deployment configuration (for gradual rollouts)
+canary:
+  enabled: false  # Set to true for canary deployments
+  weight: 10  # Percentage of traffic to canary (10%)
+  steps:
+    - weight: 10
+      pause: 300  # 5 minutes
+    - weight: 25
+      pause: 300
+    - weight: 50
+      pause: 600  # 10 minutes
+    - weight: 75
+      pause: 300
+    - weight: 100
+
+# Service Monitor for Prometheus (if using prometheus-operator)
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    prometheus: kube-prometheus
