@@ -1,0 +1,283 @@
+# ==============================================================================
+# Production-Ready PHP Pipeline
+# ==============================================================================
+# Based on Laravel, Symfony, and WordPress.com best practices for PHP CI/CD
+# Features:
+# - Composer dependency management
+# - PHPUnit parallel test execution
+# - PHPStan/Psalm static analysis
+# - PHPCS code standards
+# - Laravel/Symfony optimizations
+# - Security scanning
+# - Docker multi-stage builds
+# - Kubernetes deployment
+# ==============================================================================
+
+image: php:8.3-cli
+
+definitions:
+  caches:
+    composer: ~/.composer/cache
+    phpstan: /tmp/phpstan
+
+  services:
+    docker:
+      memory: 2048
+    mysql:
+      image: mysql:8.0
+      environment:
+        MYSQL_DATABASE: test
+        MYSQL_ROOT_PASSWORD: root
+        MYSQL_USER: test
+        MYSQL_PASSWORD: test
+
+  steps:
+    build: &build-step
+      step:
+        name: Build & Unit Tests
+        caches:
+          - composer
+        services:
+          - mysql
+        script:
+          # Install system dependencies
+          - apt-get update && apt-get install -y git unzip libzip-dev libpng-dev libonig-dev
+          - docker-php-ext-install pdo_mysql zip gd mbstring
+
+          # Install Composer
+          - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+          # Install dependencies
+          - composer install --no-interaction --prefer-dist --optimize-autoloader
+
+          # Run PHPCS
+          - vendor/bin/phpcs --standard=PSR12 --extensions=php app
+
+          # Run PHPUnit with coverage
+          - vendor/bin/phpunit --coverage-text --coverage-clover=coverage.xml --log-junit=test-results.xml
+        artifacts:
+          - coverage.xml
+          - test-results.xml
+
+    quality: &quality-step
+      step:
+        name: Code Quality & Security
+        caches:
+          - composer
+          - phpstan
+        script:
+          # Install analysis tools
+          - composer global require phpstan/phpstan psalm/psalm
+
+          # PHPStan static analysis
+          - vendor/bin/phpstan analyse --level=8 app
+
+          # Psalm static analysis
+          - vendor/bin/psalm --show-info=true --output-format=json > psalm-report.json || true
+
+          # Security check
+          - composer audit
+        artifacts:
+          - psalm-report.json
+
+pipelines:
+  default:
+    - parallel:
+        - pipe: docker://nayaksuraj/build-pipe:1.0.0
+          variables:
+            BUILD_TOOL: "php"
+            BUILD_ARGS: "--no-interaction --optimize-autoloader"
+        - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          variables:
+            TEST_TOOL: "php"
+            TEST_COMMAND: "vendor/bin/phpunit"
+            COVERAGE_ENABLED: "true"
+            COVERAGE_THRESHOLD: "80"
+
+  branches:
+    develop:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "false"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          BUILD_ARGS: "--build-arg APP_ENV=production"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG
+
+    main:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              IAC_SCAN: "true"
+              DOCKERFILE_SCAN: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Integration Tests
+          services:
+            - docker
+            - mysql
+          caches:
+            - composer
+          script:
+            - php artisan test --testsuite=Feature --parallel
+          artifacts:
+            - storage/logs/**
+
+      - step:
+          name: Laravel Optimizations
+          caches:
+            - composer
+          script:
+            # Cache configuration
+            - php artisan config:cache
+            - php artisan route:cache
+            - php artisan view:cache
+
+            # Generate optimized autoloader
+            - composer dump-autoload --optimize --classmap-authoritative
+          artifacts:
+            - bootstrap/cache/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_COMMIT:0:7}"
+          SCAN_IMAGE: "true"
+          TRIVY_SEVERITY: "CRITICAL,HIGH"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+        variables:
+          HELM_CHART_PATH: "./helm-chart"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+          PUSH_CHART: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG
+          WAIT_FOR_ROLLOUT: "true"
+        trigger: manual
+
+  tags:
+    'v*':
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Release Build
+          caches:
+            - composer
+          script:
+            - export VERSION=${BITBUCKET_TAG#v}
+            - composer install --no-dev --no-interaction --optimize-autoloader
+            - php artisan config:cache
+            - php artisan route:cache
+            - php artisan view:cache
+          artifacts:
+            - bootstrap/cache/**
+            - vendor/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          ALSO_TAG_AS_LATEST: "true"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          WAIT_FOR_ROLLOUT: "true"
+          ROLLOUT_TIMEOUT: "600"
+        trigger: manual
+
+  pull-requests:
+    '**':
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              LINTER: "phpcs"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+
+  custom:
+    performance-test:
+      - step:
+          name: Load Testing with Apache Bench
+          services:
+            - docker
+          script:
+            - apt-get update && apt-get install -y apache2-utils
+            - ab -n 1000 -c 100 http://localhost:8000/
+
+    code-fix:
+      - step:
+          name: Auto-fix Code Style
+          caches:
+            - composer
+          script:
+            - vendor/bin/phpcbf --standard=PSR12 app

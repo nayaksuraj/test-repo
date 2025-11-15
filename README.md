@@ -147,24 +147,27 @@ SONAR_HOST_URL           # SonarQube server URL
 .
 ├── bitbucket-pipelines.yml              # Main CI/CD pipeline using Bitbucket Pipes
 │
-├── bitbucket-pipes/                     # 🌟 Reusable Bitbucket Pipes
+├── bitbucket-pipes/                     # 🌟 Reusable Bitbucket Pipes (Production-Ready)
 │   ├── README.md                        # Comprehensive pipes documentation
-│   │
-│   ├── CI/                              # Continuous Integration pipes
-│   │   ├── build-pipe/                  # Generic build pipe (10+ languages)
-│   │   │   ├── Dockerfile               # Alpine-based image with build tools
-│   │   │   ├── pipe.yml                 # Pipe metadata and variables
-│   │   │   ├── pipe.sh                  # Pipe implementation (491 lines)
-│   │   │   └── README.md                # Usage documentation
-│   │   │
-│   │   ├── test-pipe/                   # Unit & integration testing
-│   │   ├── quality-pipe/                # SonarQube, linting, static analysis
-│   │   └── security-pipe/               # Comprehensive security scanning
-│   │
-│   └── CD/                              # Continuous Deployment pipes
-│       ├── docker-pipe/                 # Docker build, scan, and push
-│       ├── helm-pipe/                   # Helm chart operations
-│       └── deploy-pipe/                 # Kubernetes deployment
+│   ├── build-pipe/                      # Multi-language build (Maven, Gradle, npm, Python, Go, .NET, Rust, Ruby)
+│   ├── test-pipe/                       # Unit & integration testing with Docker/TestContainers support
+│   ├── quality-pipe/                    # SonarQube, linting, static analysis for all languages
+│   ├── security-pipe/                   # Secrets, SCA, SAST, SBOM, IaC, Dockerfile, container scanning
+│   ├── docker-pipe/                     # Docker build, Trivy/Grype scanning, multi-registry push
+│   ├── helm-pipe/                       # Helm lint, package, OCI registry support, validation
+│   └── deploy-pipe/                     # Kubernetes deployment with rollback, health checks, debugging tools
+│
+├── examples/                            # 🎯 Production-Ready Pipeline Examples (Battle-Tested)
+│   ├── README.md                        # Guide to all examples and best practices
+│   ├── java-maven/                      # Java Maven (Netflix, Amazon, Google patterns)
+│   ├── java-gradle/                     # Java Gradle (LinkedIn, Netflix patterns)
+│   ├── nodejs/                          # Node.js (Airbnb, Uber, PayPal patterns)
+│   ├── python/                          # Python (Instagram, Spotify, Dropbox patterns)
+│   ├── golang/                          # Go (Google, Uber, HashiCorp patterns)
+│   ├── dotnet/                          # .NET (Microsoft, Stack Overflow patterns)
+│   ├── rust/                            # Rust (Mozilla, Cloudflare patterns)
+│   ├── ruby/                            # Ruby (GitHub, Shopify patterns)
+│   └── php/                             # PHP (Laravel, Symfony patterns)
 │
 ├── helm-chart/                          # Generic Kubernetes Helm chart
 │   ├── Chart.yaml                       # Chart metadata
@@ -322,9 +325,30 @@ Compared to traditional script-based pipelines:
 
 ## 📖 Documentation
 
-- **[bitbucket-pipes/README.md](bitbucket-pipes/README.md)** - Detailed documentation for all pipes
+- **[bitbucket-pipes/README.md](bitbucket-pipes/README.md)** - Detailed documentation for all 7 pipes
+- **[examples/README.md](examples/README.md)** - Production-ready pipeline examples for 9 languages
 - **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - How to adopt Bitbucket Pipes in your project
 - **[helm-chart/README.md](helm-chart/README.md)** - Helm chart documentation
+
+## 🎯 Quick Start with Examples
+
+Choose your language and copy the battle-tested pipeline:
+
+```bash
+# Java with Maven (Netflix, Amazon patterns)
+cp examples/java-maven/bitbucket-pipelines.yml ./
+
+# Node.js (Airbnb, Uber patterns)
+cp examples/nodejs/bitbucket-pipelines.yml ./
+
+# Python (Instagram, Spotify patterns)
+cp examples/python/bitbucket-pipelines.yml ./
+
+# Go (Google, Uber patterns)
+cp examples/golang/bitbucket-pipelines.yml ./
+```
+
+See **[examples/README.md](examples/README.md)** for all available examples and customization guides.
 
 ## 🎓 Examples
 

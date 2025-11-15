@@ -1,0 +1,214 @@
+# ==============================================================================
+# Production-Ready Python Pipeline
+# ==============================================================================
+# Based on Instagram, Spotify, and Dropbox best practices for Python CI/CD
+# Features:
+# - Poetry/pip dependency management
+# - pytest with coverage and parallel execution
+# - Type checking with mypy
+# - Linting with ruff/pylint/black
+# - Security scanning (Bandit, Safety)
+# - Multi-Python version testing
+# - Docker builds with Alpine for smaller images
+# ==============================================================================
+
+image: python:3.11-slim
+
+definitions:
+  caches:
+    pip: ~/.cache/pip
+    poetry: ~/.cache/pypoetry
+
+  steps:
+    setup: &setup-step
+      step:
+        name: Setup Dependencies
+        caches:
+          - pip
+          - poetry
+        script:
+          - pip install --upgrade pip poetry
+          - poetry config virtualenvs.in-project true
+          - poetry install --no-interaction
+        artifacts:
+          - .venv/**
+
+pipelines:
+  default:
+    - step:
+        <<: *setup-step
+
+    - parallel:
+        - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          variables:
+            TEST_TOOL: "pytest"
+            TEST_COMMAND: "poetry run pytest --cov=src --cov-report=xml --cov-report=html -n auto"
+            COVERAGE_ENABLED: "true"
+            COVERAGE_THRESHOLD: "85"
+
+        - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+          variables:
+            LINTER: "ruff"
+            QUALITY_COMMAND: "poetry run ruff check src tests"
+
+  branches:
+    develop:
+      - step:
+          <<: *setup-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              TEST_COMMAND: "poetry run pytest --cov=src --cov-report=xml -n auto"
+              COVERAGE_ENABLED: "true"
+
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              SONAR_ENABLED: "true"
+              SONAR_TOKEN: $SONAR_TOKEN
+              LINTER: "pylint"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+
+      - step:
+          name: Type Checking & Formatting
+          caches:
+            - pip
+          script:
+            - poetry run mypy src --strict
+            - poetry run black --check src tests
+            - poetry run isort --check-only src tests
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG
+
+    main:
+      - step:
+          <<: *setup-step
+
+      - step:
+          name: Multi-Python Version Tests
+          services:
+            - docker
+          script:
+            - |
+              for version in 3.9 3.10 3.11 3.12; do
+                echo "Testing with Python $version"
+                docker run -v $(pwd):/app -w /app python:$version-slim \
+                  bash -c "pip install poetry && poetry install && poetry run pytest"
+              done
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              TEST_COMMAND: "poetry run pytest --cov=src --cov-report=xml --cov-fail-under=85"
+              COVERAGE_ENABLED: "true"
+              COVERAGE_THRESHOLD: "85"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "true"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_COMMIT:0:7}"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG
+        trigger: manual
+
+  tags:
+    'v*':
+      - step:
+          <<: *setup-step
+
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          TEST_COMMAND: "poetry run pytest --cov=src --cov-fail-under=85"
+
+      - pipe: docker://nayaksuraj/security-pipe:1.0.0
+        variables:
+          SECRETS_SCAN: "true"
+          SCA_SCAN: "true"
+          SBOM_GENERATE: "true"
+          FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Build Distribution
+          caches:
+            - pip
+          script:
+            - poetry build
+            - poetry export -f requirements.txt --output requirements.txt --without-hashes
+          artifacts:
+            - dist/**
+            - requirements.txt
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          ALSO_TAG_AS_LATEST: "true"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          WAIT_FOR_ROLLOUT: "true"
+        trigger: manual
+
+  pull-requests:
+    '**':
+      - step:
+          <<: *setup-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              TEST_COMMAND: "poetry run pytest --cov=src"
+
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              LINTER: "ruff"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
