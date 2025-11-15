@@ -1,5 +1,10 @@
 # Truly Reusable Bitbucket Pipelines - Import, Don't Copy!
 
+[![Pipeline Status](https://img.shields.io/badge/pipeline-passing-brightgreen)](https://bitbucket.org/nayaksuraj/test-repo/addon/pipelines/home)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Bitbucket Pipelines](https://img.shields.io/badge/Bitbucket-Pipelines-0052CC?logo=bitbucket)](https://bitbucket.org/nayaksuraj/test-repo)
+
 **100% Language-Agnostic** • **ZERO code duplication** • **Instant updates** • **Auto-detection**
 
 A production-ready Bitbucket Pipeline ecosystem using **Bitbucket Pipes** - organizational Docker-based components that **AUTO-DETECT your language** and work with Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET - all with the SAME pipeline!
@@ -45,7 +50,7 @@ pipelines:
 
 ## 📋 What You Get
 
-1. **9 Language-Agnostic Pipes** - Work with Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET
+1. **10 Language-Agnostic Pipes** - Work with Python, Java, Node.js, Go, Rust, Ruby, PHP, .NET
    - lint-pipe (pre-commit, linting, type checking)
    - test-pipe (all test frameworks)
    - build-pipe (all build tools)
@@ -54,7 +59,7 @@ pipelines:
    - docker-pipe (any Dockerfile)
    - helm-pipe (any Helm chart)
    - deploy-pipe (any Kubernetes app)
-   - slack-pipe (any project)
+   - notify-pipe (Slack, Email, Teams, Discord, Webhooks)
 
 2. **Universal Pipeline Example** - Works for ANY language without changes
 3. **Generic Helm Chart** - Reusable Kubernetes deployment chart
@@ -100,8 +105,9 @@ pipelines:
         variables:
           ENVIRONMENT: "dev"
           KUBECONFIG: $KUBECONFIG_DEV
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
+          CHANNELS: "slack"
           SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
           MESSAGE: "✅ Deployed to DEV"
 ```
@@ -217,6 +223,76 @@ SONAR_TOKEN              # SonarQube authentication token
 SONAR_PROJECT_KEY        # Your SonarQube project key
 SONAR_ORGANIZATION       # Your SonarCloud organization
 SONAR_HOST_URL           # SonarQube server URL
+```
+
+#### Helm Chart Registry (Optional - for chart publishing)
+```
+HELM_REGISTRY            # Helm registry URL (e.g., oci://ghcr.io/myorg/charts)
+HELM_REGISTRY_USERNAME   # Registry username
+HELM_REGISTRY_PASSWORD   # Registry password/token (use secured variables)
+```
+
+📖 **Helm Registry Setup**: See [HELM-REGISTRY-SETUP.md](./HELM-REGISTRY-SETUP.md) for complete guide on configuring GitHub Container Registry, AWS ECR, Azure ACR, Google Artifact Registry, and Harbor.
+
+## 📊 Monitoring & Observability
+
+### Integrate with Monitoring Tools
+
+The pipeline supports integration with enterprise monitoring and observability platforms:
+
+#### Supported Integrations
+- **Slack**: Real-time deployment notifications (built-in via notify-pipe)
+- **Datadog**: APM, metrics, and deployment tracking
+- **New Relic**: Application performance monitoring
+- **PagerDuty**: Incident management and on-call alerts
+- **Sentry**: Error tracking and monitoring
+
+#### Example: Datadog Integration
+
+```yaml
+- step:
+    name: Record Deployment in Datadog
+    script:
+      - |
+        curl -X POST "https://api.datadoghq.com/api/v1/events" \
+          -H "Content-Type: application/json" \
+          -H "DD-API-KEY: ${DATADOG_API_KEY}" \
+          -d '{
+            "title": "Production Deployment",
+            "text": "Version ${BITBUCKET_TAG} deployed to production",
+            "tags": ["env:production", "service:myapp", "version:${BITBUCKET_TAG}"]
+          }'
+```
+
+#### Example: New Relic Deployment Marker
+
+```yaml
+- step:
+    name: Record Deployment in New Relic
+    script:
+      - |
+        curl -X POST "https://api.newrelic.com/v2/applications/${NEWRELIC_APP_ID}/deployments.json" \
+          -H "X-Api-Key: ${NEWRELIC_API_KEY}" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "deployment": {
+              "revision": "${BITBUCKET_TAG}",
+              "changelog": "Deployed via Bitbucket Pipelines",
+              "user": "${BITBUCKET_REPO_OWNER}"
+            }
+          }'
+```
+
+### Required Monitoring Variables
+
+Add these to **Repository Settings → Pipelines → Repository Variables** (mark as secured):
+
+```
+DATADOG_API_KEY          # Datadog API key
+NEWRELIC_API_KEY         # New Relic API key
+NEWRELIC_APP_ID          # New Relic application ID
+PAGERDUTY_KEY            # PagerDuty integration key
+SENTRY_DSN               # Sentry Data Source Name
 ```
 
 ## 📂 Project Structure
@@ -403,10 +479,17 @@ Compared to traditional script-based pipelines:
 
 ## 📖 Documentation
 
-- **[bitbucket-pipes/README.md](bitbucket-pipes/README.md)** - Detailed documentation for all 7 pipes
+### Core Documentation
+- **[bitbucket-pipes/README.md](bitbucket-pipes/README.md)** - Detailed documentation for all 9 pipes
 - **[examples/README.md](examples/README.md)** - Production-ready pipeline examples for 9 languages
-- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - How to adopt Bitbucket Pipes in your project
-- **[helm-chart/README.md](helm-chart/README.md)** - Helm chart documentation
+- **[REUSABLE-PIPELINES.md](REUSABLE-PIPELINES.md)** - Deep dive on reusability philosophy, ROI, and patterns
+
+### Operational Guides
+- **[DEPLOYMENT-ENVIRONMENTS.md](DEPLOYMENT-ENVIRONMENTS.md)** - Configure Bitbucket deployment environments, permissions, and gates
+- **[ROLLBACK-PROCEDURES.md](ROLLBACK-PROCEDURES.md)** - Emergency rollback procedures and troubleshooting
+- **[HELM-REGISTRY-SETUP.md](HELM-REGISTRY-SETUP.md)** - Setup Helm chart registries (GHCR, ECR, ACR, GAR, Harbor)
+- **[helm-chart/README.md](helm-chart/README.md)** - Helm chart documentation and customization
+- **[bitbucket-pipes/notify-pipe/README.md](bitbucket-pipes/notify-pipe/README.md)** - Universal notifications (Slack, Email, Teams, Discord, Webhooks)
 
 ## 🎯 Quick Start with Examples
 

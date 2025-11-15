@@ -78,8 +78,9 @@ pipelines:
         variables:
           ENVIRONMENT: "dev"
           KUBECONFIG: $KUBECONFIG_DEV
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
+          CHANNELS: "slack"
           SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
           MESSAGE: "✅ Deployed to DEV"
 
@@ -113,8 +114,9 @@ pipelines:
           ENVIRONMENT: "production"
           KUBECONFIG: $KUBECONFIG_PRODUCTION
         trigger: manual
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
+          CHANNELS: "slack"
           MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
           MENTION_CHANNEL: "channel"
 ```
@@ -464,7 +466,7 @@ docker push nayaksuraj/lint-pipe:1.0.0
 | `docker-pipe` | Docker build/scan/push | 1.0.0 |
 | `helm-pipe` | Helm lint/package/push | 1.0.0 |
 | `deploy-pipe` | Kubernetes deployment | 1.0.0 |
-| `slack-pipe` | Slack notifications | 1.0.0 |
+| `notify-pipe` | Slack notifications | 1.0.0 |
 
 ## 🎓 Examples by Project Type
 

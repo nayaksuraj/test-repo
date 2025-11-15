@@ -153,10 +153,13 @@ custom:
 
 ### Add Notifications
 ```yaml
-- pipe: docker://nayaksuraj/slack-pipe:1.0.0
+- pipe: docker://nayaksuraj/notify-pipe:1.0.0
   variables:
-    WEBHOOK_URL: $SLACK_WEBHOOK
+    CHANNELS: "slack"
+    SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
     MESSAGE: "Deployment to ${ENVIRONMENT} completed!"
+    STATUS: "success"
+    ENVIRONMENT: "${ENVIRONMENT}"
 ```
 
 ## Performance Benchmarks

@@ -190,7 +190,7 @@ The templates themselves use **organizational Bitbucket Pipes** to avoid duplica
 | Docker Build | `docker-pipe:1.0.0` | Docker build logic, Trivy installation/scan, registry push |
 | Helm Package | `helm-pipe:1.0.0` | Helm lint/package/push logic |
 | Deploy | `deploy-pipe:1.0.0` | Kubernetes deployment scripts |
-| Notify | `slack-pipe:1.0.0` | Manual curl commands, JSON payload formatting, Slack API integration |
+| Notify | `notify-pipe:1.0.0` | Manual curl commands, JSON payload formatting, Slack API integration |
 
 **Two Levels of Reusability**:
 1. **Projects reuse templates** (96% reduction in YAML duplication)

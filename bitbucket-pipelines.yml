@@ -9,130 +9,384 @@
 
 image: atlassian/default-image:4
 
+# ==============================================================================
+# Performance Optimizations
+# ==============================================================================
+clone:
+  depth: 50  # Shallow clone for faster checkout
+  lfs: false  # Disable Git LFS if not needed
+
+definitions:
+  caches:
+    docker: /var/lib/docker
+    maven: ~/.m2/repository
+    gradle: ~/.gradle
+    npm: ~/.npm
+    pip: ~/.cache/pip
+    go: ~/.cache/go-build
+
+  services:
+    docker:
+      memory: 2048
+
 pipelines:
   # ==============================================================================
   # Pull Requests - Fast Feedback
   # ==============================================================================
   pull-requests:
     '**':
-      # Lint & Type Check - Auto-detects language
-      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
-        # Auto-detects: Python, JavaScript, TypeScript, Go, Java, Rust, Ruby
-        # Runs: pre-commit, linting, formatting check, type checking
+      - step:
+          name: 🔍 Quality & Security Checks (PR)
+          size: 2x  # Increased resources for parallel execution
+          max-time: 15  # Prevent hanging builds
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            # Lint & Type Check - Auto-detects language
+            - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+              # Auto-detects: Python, JavaScript, TypeScript, Go, Java, Rust, Ruby
+              # Runs: pre-commit, linting, formatting check, type checking
+          after-script:
+            # Cleanup even if step fails
+            - docker system prune -f || true
+            - rm -rf /tmp/* || true
 
-      # Run Tests - Auto-detects test framework
-      - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        # Auto-detects: pytest, jest, go test, maven, gradle, etc.
-        variables:
-          COVERAGE_ENABLED: "true"
+      - parallel:
+          fail-fast: true  # Stop all on first failure
+          steps:
+            - step:
+                name: 🧪 Tests
+                max-time: 10
+                caches:
+                  - docker
+                  - maven
+                  - gradle
+                  - npm
+                  - pip
+                  - go
+                script:
+                  # Run Tests - Auto-detects test framework
+                  - pipe: docker://nayaksuraj/test-pipe:1.0.0
+                    # Auto-detects: pytest, jest, go test, maven, gradle, etc.
+                    variables:
+                      COVERAGE_ENABLED: "true"
+                artifacts:
+                  - coverage-reports/**
+                  - test-results/**
+                after-script:
+                  - rm -rf /tmp/* || true
 
-      # Security Scan - Auto-detects package manager
-      - pipe: docker://nayaksuraj/security-pipe:1.0.0
-        # Auto-detects: npm, pip, maven, go mod, cargo, etc.
-        variables:
-          SECRETS_SCAN: "true"
-          SCA_SCAN: "true"
-          FAIL_ON_HIGH: "false"
+            - step:
+                name: 🔐 Security Scan
+                max-time: 10
+                caches:
+                  - docker
+                script:
+                  # Security Scan - Auto-detects package manager
+                  - pipe: docker://nayaksuraj/security-pipe:1.0.0
+                    # Auto-detects: npm, pip, maven, go mod, cargo, etc.
+                    variables:
+                      SECRETS_SCAN: "true"
+                      SCA_SCAN: "true"
+                      FAIL_ON_HIGH: "false"
+                artifacts:
+                  - security-reports/**
+                after-script:
+                  - rm -rf /tmp/* || true
 
   # ==============================================================================
   # Develop Branch - Auto-Deploy to Dev
   # ==============================================================================
   branches:
     develop:
-      # Lint & Type Check
-      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+      - step:
+          name: 🔍 Lint & Type Check
+          max-time: 10
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            # Lint & Type Check
+            - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+          after-script:
+            - rm -rf /tmp/* || true
 
-      # Build - Auto-detects build tool
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-        # Auto-detects: Maven, Gradle, npm, poetry, go, dotnet, cargo, etc.
+      - step:
+          name: 🏗️ Build Application
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            # Build - Auto-detects build tool
+            - pipe: docker://nayaksuraj/build-pipe:1.0.0
+              # Auto-detects: Maven, Gradle, npm, poetry, go, dotnet, cargo, etc.
+          artifacts:
+            - target/**/*.jar
+            - build/**
+            - dist/**
+          after-script:
+            - rm -rf /tmp/* || true
 
-      # Test with Coverage
-      - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        variables:
-          COVERAGE_ENABLED: "true"
+      - step:
+          name: 🧪 Test with Coverage
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            # Test with Coverage
+            - pipe: docker://nayaksuraj/test-pipe:1.0.0
+              variables:
+                COVERAGE_ENABLED: "true"
+          artifacts:
+            - coverage-reports/**
+            - test-results/**
+          after-script:
+            - rm -rf /tmp/* || true
 
       # Parallel Quality & Security
       - parallel:
-          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
-            # Works with ALL languages via SonarQube
-            variables:
-              SONAR_ENABLED: "true"
-              SONAR_TOKEN: $SONAR_TOKEN
+          fail-fast: false  # Continue all quality checks even if one fails
+          steps:
+            - step:
+                name: 📊 Code Quality
+                max-time: 10
+                caches:
+                  - docker
+                script:
+                  - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+                    # Works with ALL languages via SonarQube
+                    variables:
+                      SONAR_ENABLED: "true"
+                      SONAR_TOKEN: $SONAR_TOKEN
+                artifacts:
+                  - quality-reports/**
+                after-script:
+                  - rm -rf /tmp/* || true
 
-          - pipe: docker://nayaksuraj/security-pipe:1.0.0
-            variables:
-              SBOM_GENERATE: "true"
-              SAST_SCAN: "true"
+            - step:
+                name: 🔐 Security Scan
+                max-time: 10
+                caches:
+                  - docker
+                script:
+                  - pipe: docker://nayaksuraj/security-pipe:1.0.0
+                    variables:
+                      SBOM_GENERATE: "true"
+                      SAST_SCAN: "true"
+                artifacts:
+                  - security-reports/**
+                  - sbom/**
+                after-script:
+                  - rm -rf /tmp/* || true
 
       # Docker Build & Push - Completely agnostic
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
-        # Works with ANY Dockerfile
-        variables:
-          DOCKER_REGISTRY: $DOCKER_REGISTRY
-          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
-          DOCKER_USERNAME: $DOCKER_USERNAME
-          DOCKER_PASSWORD: $DOCKER_PASSWORD
-          SCAN_IMAGE: "true"
+      - step:
+          name: 🐳 Docker Build & Push
+          size: 2x
+          max-time: 20
+          services:
+            - docker
+          caches:
+            - docker
+          script:
+            - export DOCKER_BUILDKIT=1
+            - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+              # Works with ANY Dockerfile
+              variables:
+                DOCKER_REGISTRY: $DOCKER_REGISTRY
+                DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+                DOCKER_USERNAME: $DOCKER_USERNAME
+                DOCKER_PASSWORD: $DOCKER_PASSWORD
+                SCAN_IMAGE: "true"
+          artifacts:
+            - image-scan-reports/**
+          after-script:
+            - docker system prune -f || true
+            - rm -rf /tmp/* || true
 
       # Deploy to Dev - Completely agnostic
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
-        # Works with ANY Kubernetes application
-        variables:
-          ENVIRONMENT: "dev"
-          DEPLOY_NAMESPACE: "development"
-          KUBECONFIG: $KUBECONFIG_DEV
-          HELM_CHART_PATH: "./helm-chart"
-          HELM_VALUES_FILE: "values-dev.yaml"
+      - step:
+          name: 🚀 Deploy to Dev
+          deployment: development
+          max-time: 10
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              # Works with ANY Kubernetes application
+              variables:
+                ENVIRONMENT: "dev"
+                DEPLOY_NAMESPACE: "development"
+                KUBECONFIG: $KUBECONFIG_DEV
+                HELM_CHART_PATH: "./helm-chart"
+                HELM_VALUES_FILE: "values-dev.yaml"
+          after-script:
+            - rm -rf /tmp/* || true
 
       # Notify - Completely agnostic
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
-        # Works for ANY project
-        variables:
-          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
-          MESSAGE: "✅ Deployed to DEV"
-          ENVIRONMENT: "dev"
+      - step:
+          name: 📢 Notify Success
+          script:
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+              # Works for ANY project
+              variables:
+                CHANNELS: "slack"
+                SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+                MESSAGE: "✅ Deployed to DEV"
+                ENVIRONMENT: "dev"
 
   # ==============================================================================
   # Main Branch - Deploy to Staging
   # ==============================================================================
     main:
-      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-      - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        variables:
-          COVERAGE_ENABLED: "true"
+      - step:
+          name: 🔍 Lint & Type Check
+          max-time: 10
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+          after-script:
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: 🏗️ Build Application
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/build-pipe:1.0.0
+          artifacts:
+            - target/**/*.jar
+            - build/**
+            - dist/**
+          after-script:
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: 🧪 Test with Coverage
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/test-pipe:1.0.0
+              variables:
+                COVERAGE_ENABLED: "true"
+          artifacts:
+            - coverage-reports/**
+            - test-results/**
+          after-script:
+            - rm -rf /tmp/* || true
 
       - parallel:
-          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
-            variables:
-              SONAR_ENABLED: "true"
-              SONAR_TOKEN: $SONAR_TOKEN
-              QUALITY_GATE_ENABLED: "true"
+          fail-fast: false
+          steps:
+            - step:
+                name: 📊 Code Quality with Gate
+                max-time: 15
+                caches:
+                  - docker
+                script:
+                  - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+                    variables:
+                      SONAR_ENABLED: "true"
+                      SONAR_TOKEN: $SONAR_TOKEN
+                      QUALITY_GATE_ENABLED: "true"
+                artifacts:
+                  - quality-reports/**
+                after-script:
+                  - rm -rf /tmp/* || true
 
-          - pipe: docker://nayaksuraj/security-pipe:1.0.0
-            variables:
-              FAIL_ON_HIGH: "true"
-              SAST_SCAN: "true"
+            - step:
+                name: 🔐 Security Scan (Strict)
+                max-time: 15
+                caches:
+                  - docker
+                script:
+                  - pipe: docker://nayaksuraj/security-pipe:1.0.0
+                    variables:
+                      FAIL_ON_HIGH: "true"
+                      SAST_SCAN: "true"
+                artifacts:
+                  - security-reports/**
+                after-script:
+                  - rm -rf /tmp/* || true
 
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
-        variables:
-          DOCKER_REGISTRY: $DOCKER_REGISTRY
-          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
-          DOCKER_USERNAME: $DOCKER_USERNAME
-          DOCKER_PASSWORD: $DOCKER_PASSWORD
-          SCAN_IMAGE: "true"
-          TRIVY_EXIT_CODE: "1"
+      - step:
+          name: 🐳 Docker Build & Scan
+          size: 2x
+          max-time: 20
+          services:
+            - docker
+          caches:
+            - docker
+          script:
+            - export DOCKER_BUILDKIT=1
+            - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+              variables:
+                DOCKER_REGISTRY: $DOCKER_REGISTRY
+                DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+                DOCKER_USERNAME: $DOCKER_USERNAME
+                DOCKER_PASSWORD: $DOCKER_PASSWORD
+                SCAN_IMAGE: "true"
+                TRIVY_EXIT_CODE: "1"
+          artifacts:
+            - image-scan-reports/**
+          after-script:
+            - docker system prune -f || true
+            - rm -rf /tmp/* || true
 
-      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
-        variables:
-          HELM_CHART_PATH: "./helm-chart"
-          LINT_CHART: "true"
-          PACKAGE_CHART: "true"
+      - step:
+          name: ⎈ Helm Package
+          max-time: 5
+          script:
+            - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+              variables:
+                HELM_CHART_PATH: "./helm-chart"
+                LINT_CHART: "true"
+                PACKAGE_CHART: "true"
+          artifacts:
+            - helm-packages/**
+          after-script:
+            - rm -rf /tmp/* || true
 
       - step:
           name: 🚀 Deploy to Staging
           deployment: staging
           trigger: manual
+          max-time: 10
           script:
             - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
               variables:
@@ -141,51 +395,146 @@ pipelines:
                 KUBECONFIG: $KUBECONFIG_STAGING
                 HELM_CHART_PATH: "./helm-chart"
                 HELM_VALUES_FILE: "values-staging.yaml"
+          after-script:
+            - rm -rf /tmp/* || true
 
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
-        variables:
-          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
-          MESSAGE: "✅ Deployed to STAGING"
-          ENVIRONMENT: "staging"
+      - step:
+          name: 📢 Notify Success
+          script:
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+              variables:
+                CHANNELS: "slack"
+                SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+                MESSAGE: "✅ Deployed to STAGING"
+                ENVIRONMENT: "staging"
 
   # ==============================================================================
   # Tagged Releases - Production Deployment
   # ==============================================================================
   tags:
     'v*':
-      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-      - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        variables:
-          COVERAGE_ENABLED: "true"
+      - step:
+          name: 🔍 Lint & Type Check
+          max-time: 10
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+          after-script:
+            - rm -rf /tmp/* || true
 
-      - pipe: docker://nayaksuraj/security-pipe:1.0.0
-        variables:
-          FAIL_ON_HIGH: "true"
-          SAST_SCAN: "true"
+      - step:
+          name: 🏗️ Build Release
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/build-pipe:1.0.0
+          artifacts:
+            - target/**/*.jar
+            - build/**
+            - dist/**
+          after-script:
+            - rm -rf /tmp/* || true
 
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
-        variables:
-          DOCKER_REGISTRY: $DOCKER_REGISTRY
-          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
-          DOCKER_USERNAME: $DOCKER_USERNAME
-          DOCKER_PASSWORD: $DOCKER_PASSWORD
-          IMAGE_TAG: "${BITBUCKET_TAG#v}"
-          SCAN_IMAGE: "true"
-          TRIVY_EXIT_CODE: "1"
+      - step:
+          name: 🧪 Test with Coverage
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/test-pipe:1.0.0
+              variables:
+                COVERAGE_ENABLED: "true"
+          artifacts:
+            - coverage-reports/**
+            - test-results/**
+          after-script:
+            - rm -rf /tmp/* || true
 
-      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
-        variables:
-          HELM_CHART_PATH: "./helm-chart"
-          CHART_VERSION: "${BITBUCKET_TAG#v}"
-          LINT_CHART: "true"
-          PACKAGE_CHART: "true"
-          PUSH_CHART: "true"
+      - step:
+          name: 🔐 Security Scan (Production Grade)
+          max-time: 20
+          caches:
+            - docker
+          script:
+            - pipe: docker://nayaksuraj/security-pipe:1.0.0
+              variables:
+                FAIL_ON_HIGH: "true"
+                SAST_SCAN: "true"
+                SBOM_GENERATE: "true"
+                IAC_SCAN: "true"
+          artifacts:
+            - security-reports/**
+            - sbom/**
+          after-script:
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: 🐳 Docker Build & Sign
+          size: 2x
+          max-time: 25
+          services:
+            - docker
+          caches:
+            - docker
+          script:
+            - export DOCKER_BUILDKIT=1
+            - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+              variables:
+                DOCKER_REGISTRY: $DOCKER_REGISTRY
+                DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+                DOCKER_USERNAME: $DOCKER_USERNAME
+                DOCKER_PASSWORD: $DOCKER_PASSWORD
+                IMAGE_TAG: "${BITBUCKET_TAG#v}"
+                ALSO_TAG_AS_LATEST: "true"
+                SCAN_IMAGE: "true"
+                TRIVY_EXIT_CODE: "1"
+          artifacts:
+            - image-scan-reports/**
+          after-script:
+            - docker system prune -f || true
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: ⎈ Helm Package & Push
+          max-time: 10
+          script:
+            - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+              variables:
+                HELM_CHART_PATH: "./helm-chart"
+                CHART_VERSION: "${BITBUCKET_TAG#v}"
+                HELM_REGISTRY: $HELM_REGISTRY
+                HELM_REGISTRY_USERNAME: $HELM_REGISTRY_USERNAME
+                HELM_REGISTRY_PASSWORD: $HELM_REGISTRY_PASSWORD
+                LINT_CHART: "true"
+                PACKAGE_CHART: "true"
+                PUSH_CHART: "true"
+          artifacts:
+            - helm-packages/**
+          after-script:
+            - rm -rf /tmp/* || true
 
       - step:
           name: 🚀 Deploy to Production
           deployment: production
           trigger: manual
+          max-time: 30
           script:
             - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
               variables:
@@ -195,12 +544,272 @@ pipelines:
                 HELM_CHART_PATH: "./helm-chart"
                 HELM_VALUES_FILE: "values-production.yaml"
                 DEPLOYMENT_STRATEGY: "canary"
+                WAIT_FOR_ROLLOUT: "true"
+                ROLLOUT_TIMEOUT: "600"
+          after-script:
+            - rm -rf /tmp/* || true
 
-      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
-        variables:
-          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
-          MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
-          ENVIRONMENT: "production"
-          TITLE: "Production Release"
-          MENTION_CHANNEL: "channel"
-          CUSTOM_FIELDS: '{"Version":"${BITBUCKET_TAG#v}","Deployment":"Canary → Full Rollout"}'
+      - step:
+          name: 📢 Notify Production Release
+          script:
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+              variables:
+                CHANNELS: "slack"
+                SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+                MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
+                ENVIRONMENT: "production"
+                TITLE: "Production Release"
+                MENTION_CHANNEL: "channel"
+                CUSTOM_FIELDS: '{"Version":"${BITBUCKET_TAG#v}","Deployment":"Canary → Full Rollout"}'
+
+  # ==============================================================================
+  # Custom Pipelines - Manual Operations
+  # ==============================================================================
+  custom:
+    # Comprehensive Security Audit
+    security-audit:
+      - step:
+          name: 🔐 Comprehensive Security Audit
+          size: 2x
+          max-time: 30
+          caches:
+            - docker
+          script:
+            - pipe: docker://nayaksuraj/security-pipe:1.0.0
+              variables:
+                SECRETS_SCAN: "true"
+                SCA_SCAN: "true"
+                SAST_SCAN: "true"
+                SBOM_GENERATE: "true"
+                IAC_SCAN: "true"
+                DOCKERFILE_SCAN: "true"
+                CONTAINER_SCAN: "true"
+                CONTAINER_IMAGE: "${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}:latest"
+                FAIL_ON_HIGH: "false"
+                FAIL_ON_CRITICAL: "false"
+          artifacts:
+            - security-reports/**
+            - sbom/**
+          after-script:
+            - rm -rf /tmp/* || true
+
+    # Rollback Production Deployment
+    rollback-production:
+      - step:
+          name: ⏮️ Rollback Production
+          deployment: production
+          trigger: manual
+          max-time: 15
+          script:
+            - echo "Rolling back production deployment..."
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "production"
+                DEPLOY_NAMESPACE: "production"
+                KUBECONFIG: $KUBECONFIG_PRODUCTION
+                HELM_CHART_PATH: "./helm-chart"
+                HELM_VALUES_FILE: "values-production.yaml"
+                ROLLBACK: "true"
+          after-script:
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: 📢 Notify Rollback
+          script:
+            - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+              variables:
+                CHANNELS: "slack"
+                SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+                MESSAGE: "⚠️ Production rolled back"
+                ENVIRONMENT: "production"
+                TITLE: "Production Rollback"
+                MENTION_CHANNEL: "channel"
+                STATUS: "warning"
+
+    # Rollback Staging Deployment
+    rollback-staging:
+      - step:
+          name: ⏮️ Rollback Staging
+          deployment: staging
+          max-time: 10
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "staging"
+                DEPLOY_NAMESPACE: "staging"
+                KUBECONFIG: $KUBECONFIG_STAGING
+                HELM_CHART_PATH: "./helm-chart"
+                HELM_VALUES_FILE: "values-staging.yaml"
+                ROLLBACK: "true"
+          after-script:
+            - rm -rf /tmp/* || true
+
+    # Hotfix Deployment
+    hotfix-deploy:
+      - step:
+          name: 🚨 Hotfix Build & Test
+          max-time: 20
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+            - pipe: docker://nayaksuraj/build-pipe:1.0.0
+            - pipe: docker://nayaksuraj/test-pipe:1.0.0
+              variables:
+                COVERAGE_ENABLED: "true"
+          artifacts:
+            - target/**/*.jar
+            - build/**
+            - dist/**
+          after-script:
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: 🔐 Security Scan (Fast)
+          max-time: 10
+          caches:
+            - docker
+          script:
+            - pipe: docker://nayaksuraj/security-pipe:1.0.0
+              variables:
+                SECRETS_SCAN: "true"
+                FAIL_ON_CRITICAL: "true"
+          after-script:
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: 🐳 Docker Build (Hotfix)
+          size: 2x
+          max-time: 15
+          services:
+            - docker
+          caches:
+            - docker
+          script:
+            - export DOCKER_BUILDKIT=1
+            - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+              variables:
+                DOCKER_REGISTRY: $DOCKER_REGISTRY
+                DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+                DOCKER_USERNAME: $DOCKER_USERNAME
+                DOCKER_PASSWORD: $DOCKER_PASSWORD
+                IMAGE_TAG: "hotfix-${BITBUCKET_COMMIT:0:7}"
+                SCAN_IMAGE: "true"
+          after-script:
+            - docker system prune -f || true
+
+      - step:
+          name: 🚀 Deploy Hotfix to Production
+          deployment: production
+          trigger: manual
+          max-time: 15
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "production"
+                DEPLOY_NAMESPACE: "production"
+                KUBECONFIG: $KUBECONFIG_PRODUCTION
+                HELM_CHART_PATH: "./helm-chart"
+                HELM_VALUES_FILE: "values-production.yaml"
+                IMAGE_TAG: "hotfix-${BITBUCKET_COMMIT:0:7}"
+          after-script:
+            - rm -rf /tmp/* || true
+
+    # Build and Test Only (No Deploy)
+    build-only:
+      - step:
+          name: 🏗️ Build Application
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/build-pipe:1.0.0
+          artifacts:
+            - target/**/*.jar
+            - build/**
+            - dist/**
+          after-script:
+            - rm -rf /tmp/* || true
+
+      - step:
+          name: 🧪 Run Tests
+          max-time: 15
+          caches:
+            - docker
+            - maven
+            - gradle
+            - npm
+            - pip
+            - go
+          script:
+            - pipe: docker://nayaksuraj/test-pipe:1.0.0
+              variables:
+                COVERAGE_ENABLED: "true"
+          artifacts:
+            - coverage-reports/**
+            - test-results/**
+          after-script:
+            - rm -rf /tmp/* || true
+
+    # Deploy to Specific Environment
+    deploy-dev:
+      - step:
+          name: 🚀 Deploy to Dev
+          deployment: development
+          max-time: 10
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "dev"
+                DEPLOY_NAMESPACE: "development"
+                KUBECONFIG: $KUBECONFIG_DEV
+                HELM_CHART_PATH: "./helm-chart"
+                HELM_VALUES_FILE: "values-dev.yaml"
+          after-script:
+            - rm -rf /tmp/* || true
+
+    deploy-staging:
+      - step:
+          name: 🚀 Deploy to Staging
+          deployment: staging
+          trigger: manual
+          max-time: 10
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "staging"
+                DEPLOY_NAMESPACE: "staging"
+                KUBECONFIG: $KUBECONFIG_STAGING
+                HELM_CHART_PATH: "./helm-chart"
+                HELM_VALUES_FILE: "values-staging.yaml"
+          after-script:
+            - rm -rf /tmp/* || true
+
+    deploy-production:
+      - step:
+          name: 🚀 Deploy to Production
+          deployment: production
+          trigger: manual
+          max-time: 30
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "production"
+                DEPLOY_NAMESPACE: "production"
+                KUBECONFIG: $KUBECONFIG_PRODUCTION
+                HELM_CHART_PATH: "./helm-chart"
+                HELM_VALUES_FILE: "values-production.yaml"
+                DEPLOYMENT_STRATEGY: "canary"
+                WAIT_FOR_ROLLOUT: "true"
+          after-script:
+            - rm -rf /tmp/* || true

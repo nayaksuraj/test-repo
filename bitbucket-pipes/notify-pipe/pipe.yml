@@ -1,0 +1,243 @@
+name: Universal Notification Pipe
+description: Send notifications to Slack, Email, Teams, Discord, Webhooks, and more - all from one pipe
+repository: https://github.com/nayaksuraj/test-repo
+
+# Pipe metadata
+metadata:
+  type: notification
+  category: messaging
+  vendor: nayaksuraj
+  version: 1.0.0
+
+# Variables that can be configured
+variables:
+  # ============================================================================
+  # CHANNEL SELECTION (Required)
+  # ============================================================================
+  - name: CHANNELS
+    description: 'Notification channels (comma-separated): slack, email, teams, discord, webhook'
+    required: true
+    example: "slack,email"
+
+  # ============================================================================
+  # MESSAGE CONTENT (Required)
+  # ============================================================================
+  - name: MESSAGE
+    description: Main notification message
+    required: true
+    example: "✅ Deployed to production successfully"
+
+  - name: TITLE
+    description: Notification title
+    required: false
+    default: "Bitbucket Pipeline Notification"
+    example: "Production Deployment"
+
+  - name: STATUS
+    description: 'Status level: success, warning, error, info'
+    required: false
+    default: "success"
+    example: "success"
+
+  - name: ENVIRONMENT
+    description: Deployment environment
+    required: false
+    example: "production"
+
+  # ============================================================================
+  # SLACK CONFIGURATION
+  # ============================================================================
+  - name: SLACK_WEBHOOK_URL
+    description: Slack incoming webhook URL
+    required: false
+    secured: true
+    example: "https://hooks.slack.com/services/T00000000/B00000000/XXXX"
+
+  - name: SLACK_CHANNEL
+    description: Override default Slack channel
+    required: false
+    example: "#deployments"
+
+  - name: SLACK_USERNAME
+    description: Bot username for Slack message
+    required: false
+    default: "Bitbucket Pipeline"
+    example: "CI/CD Bot"
+
+  - name: SLACK_ICON_EMOJI
+    description: Emoji icon for Slack bot
+    required: false
+    default: ":rocket:"
+    example: ":robot_face:"
+
+  # ============================================================================
+  # EMAIL CONFIGURATION
+  # ============================================================================
+  - name: EMAIL_TO
+    description: Email recipients (comma-separated)
+    required: false
+    example: "team@example.com,ops@example.com"
+
+  - name: EMAIL_FROM
+    description: Email sender address
+    required: false
+    default: "noreply@bitbucket-pipelines.com"
+    example: "cicd@company.com"
+
+  - name: EMAIL_SMTP_HOST
+    description: SMTP server hostname
+    required: false
+    example: "smtp.gmail.com"
+
+  - name: EMAIL_SMTP_PORT
+    description: SMTP server port
+    required: false
+    default: "587"
+    example: "587"
+
+  - name: EMAIL_SMTP_USERNAME
+    description: SMTP authentication username
+    required: false
+    secured: true
+    example: "user@gmail.com"
+
+  - name: EMAIL_SMTP_PASSWORD
+    description: SMTP authentication password
+    required: false
+    secured: true
+    example: "app-password"
+
+  - name: EMAIL_USE_TLS
+    description: Use TLS for SMTP connection
+    required: false
+    default: "true"
+    example: "true"
+
+  # ============================================================================
+  # MICROSOFT TEAMS CONFIGURATION
+  # ============================================================================
+  - name: TEAMS_WEBHOOK_URL
+    description: Microsoft Teams incoming webhook URL
+    required: false
+    secured: true
+    example: "https://outlook.office.com/webhook/..."
+
+  - name: TEAMS_THEME_COLOR
+    description: Theme color for Teams card (hex)
+    required: false
+    example: "0078D7"
+
+  # ============================================================================
+  # DISCORD CONFIGURATION
+  # ============================================================================
+  - name: DISCORD_WEBHOOK_URL
+    description: Discord webhook URL
+    required: false
+    secured: true
+    example: "https://discord.com/api/webhooks/..."
+
+  - name: DISCORD_USERNAME
+    description: Bot username for Discord message
+    required: false
+    default: "CI/CD Bot"
+    example: "Deployment Bot"
+
+  - name: DISCORD_AVATAR_URL
+    description: Avatar URL for Discord bot
+    required: false
+    example: "https://example.com/avatar.png"
+
+  # ============================================================================
+  # GENERIC WEBHOOK CONFIGURATION
+  # ============================================================================
+  - name: WEBHOOK_URL
+    description: Generic webhook URL for custom integrations
+    required: false
+    secured: true
+    example: "https://api.example.com/notifications"
+
+  - name: WEBHOOK_METHOD
+    description: HTTP method for webhook
+    required: false
+    default: "POST"
+    example: "POST"
+
+  - name: WEBHOOK_HEADERS
+    description: Custom headers as JSON
+    required: false
+    example: '{"Authorization":"Bearer token","Content-Type":"application/json"}'
+
+  - name: WEBHOOK_PAYLOAD_TEMPLATE
+    description: Custom payload template (jinja2 supported)
+    required: false
+    example: '{"text":"{{MESSAGE}}","status":"{{STATUS}}"}'
+
+  # ============================================================================
+  # COMMON OPTIONS
+  # ============================================================================
+  - name: INCLUDE_COMMIT_INFO
+    description: Include git commit information
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: INCLUDE_BUILD_INFO
+    description: Include build/pipeline information
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: INCLUDE_REPO_INFO
+    description: Include repository information
+    required: false
+    default: "true"
+    example: "true"
+
+  - name: CUSTOM_FIELDS
+    description: Custom fields as JSON key-value pairs
+    required: false
+    example: '{"Version":"1.2.3","Duration":"5m","Replicas":"3"}'
+
+  - name: MENTION_USERS
+    description: User IDs to mention (channel-specific, comma-separated)
+    required: false
+    example: "U123456,U789012"
+
+  - name: MENTION_CHANNEL
+    description: 'Mention @channel or @here (for Slack/Discord)'
+    required: false
+    example: "channel"
+
+  - name: PRIORITY
+    description: 'Notification priority: low, normal, high, urgent'
+    required: false
+    default: "normal"
+    example: "high"
+
+  - name: ATTACH_LOGS
+    description: Attach recent pipeline logs to notification
+    required: false
+    default: "false"
+    example: "true"
+
+  - name: DRY_RUN
+    description: Validate configuration without sending
+    required: false
+    default: "false"
+    example: "true"
+
+  - name: DEBUG
+    description: Enable debug output
+    required: false
+    default: "false"
+    example: "true"
+
+tags:
+  - notifications
+  - slack
+  - email
+  - teams
+  - discord
+  - webhook
+  - messaging
+  - alerts
