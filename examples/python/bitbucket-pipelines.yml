@@ -1,88 +1,70 @@
 # ==============================================================================
-# Production-Ready Python Pipeline
+# Minimal Reusable Python Pipeline - Uses Only Organizational Pipes
 # ==============================================================================
-# Based on Instagram, Spotify, and Dropbox best practices for Python CI/CD
-# Features:
-# - Poetry/pip dependency management
-# - pytest with coverage and parallel execution
-# - Type checking with mypy
-# - Linting with ruff/pylint/black
-# - Security scanning (Bandit, Safety)
-# - Multi-Python version testing
-# - Docker builds with Alpine for smaller images
+# This pipeline imports organizational pipes WITHOUT copying any logic
+# All pipeline intelligence is in the pipes - ZERO code duplication!
+#
+# To update: Just change pipe versions (e.g., 1.0.0 → 1.1.0)
+# See: /REUSABLE-PIPELINES.md for complete guide
 # ==============================================================================
 
 image: python:3.11-slim
 
-definitions:
-  caches:
-    pip: ~/.cache/pip
-    poetry: ~/.cache/pypoetry
-
-  steps:
-    setup: &setup-step
-      step:
-        name: Setup Dependencies
-        caches:
-          - pip
-          - poetry
-        script:
-          - pip install --upgrade pip poetry
-          - poetry config virtualenvs.in-project true
-          - poetry install --no-interaction
-        artifacts:
-          - .venv/**
-
 pipelines:
-  default:
-    - step:
-        <<: *setup-step
+  # ==============================================================================
+  # Pull Requests - Fast Feedback
+  # ==============================================================================
+  pull-requests:
+    '**':
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+        variables:
+          LANGUAGE: "python"
+          PRE_COMMIT_ENABLED: "true"
+          LOCKFILE_CHECK: "true"
+          LINT_ENABLED: "true"
+          TYPE_CHECK_ENABLED: "true"
 
-    - parallel:
-        - pipe: docker://nayaksuraj/test-pipe:1.0.0
-          variables:
-            TEST_TOOL: "pytest"
-            TEST_COMMAND: "poetry run pytest --cov=src --cov-report=xml --cov-report=html -n auto"
-            COVERAGE_ENABLED: "true"
-            COVERAGE_THRESHOLD: "85"
-
-        - pipe: docker://nayaksuraj/quality-pipe:1.0.0
-          variables:
-            LINTER: "ruff"
-            QUALITY_COMMAND: "poetry run ruff check src tests"
-
-  branches:
-    develop:
-      - step:
-          <<: *setup-step
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          TEST_TOOL: "pytest"
+          COVERAGE_ENABLED: "true"
 
       - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
             variables:
-              TEST_COMMAND: "poetry run pytest --cov=src --cov-report=xml -n auto"
-              COVERAGE_ENABLED: "true"
+              SONAR_ENABLED: "${SONAR_ENABLED:-false}"
+              SONAR_TOKEN: $SONAR_TOKEN
 
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              FAIL_ON_HIGH: "false"
+
+  # ==============================================================================
+  # Develop Branch - Auto-Deploy to Dev
+  # ==============================================================================
+  branches:
+    develop:
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+        variables:
+          LANGUAGE: "python"
+
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          TEST_TOOL: "pytest"
+          COVERAGE_ENABLED: "true"
+
+      - parallel:
           - pipe: docker://nayaksuraj/quality-pipe:1.0.0
             variables:
               SONAR_ENABLED: "true"
               SONAR_TOKEN: $SONAR_TOKEN
-              LINTER: "pylint"
 
           - pipe: docker://nayaksuraj/security-pipe:1.0.0
             variables:
-              SECRETS_SCAN: "true"
-              SCA_SCAN: "true"
-              SAST_SCAN: "true"
               SBOM_GENERATE: "true"
-
-      - step:
-          name: Type Checking & Formatting
-          caches:
-            - pip
-          script:
-            - poetry run mypy src --strict
-            - poetry run black --check src tests
-            - poetry run isort --check-only src tests
+              SAST_SCAN: "true"
 
       - pipe: docker://nayaksuraj/docker-pipe:1.0.0
         variables:
@@ -91,88 +73,104 @@ pipelines:
           DOCKER_USERNAME: $DOCKER_USERNAME
           DOCKER_PASSWORD: $DOCKER_PASSWORD
           SCAN_IMAGE: "true"
-          PUSH_IMAGE: "true"
 
       - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
         variables:
           ENVIRONMENT: "dev"
-          NAMESPACE: "development"
-          KUBECONFIG: $KUBECONFIG
+          DEPLOY_NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG_DEV
+          HELM_CHART_PATH: "../../helm-chart"
+          HELM_VALUES_FILE: "helm-values-dev.yaml"
 
+      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+        variables:
+          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+          MESSAGE: "✅ Deployed to DEV"
+          ENVIRONMENT: "dev"
+          STATUS: "success"
+
+  # ==============================================================================
+  # Main Branch - Deploy to Staging
+  # ==============================================================================
     main:
-      - step:
-          <<: *setup-step
-
-      - step:
-          name: Multi-Python Version Tests
-          services:
-            - docker
-          script:
-            - |
-              for version in 3.9 3.10 3.11 3.12; do
-                echo "Testing with Python $version"
-                docker run -v $(pwd):/app -w /app python:$version-slim \
-                  bash -c "pip install poetry && poetry install && poetry run pytest"
-              done
-
-      - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
-            variables:
-              TEST_COMMAND: "poetry run pytest --cov=src --cov-report=xml --cov-fail-under=85"
-              COVERAGE_ENABLED: "true"
-              COVERAGE_THRESHOLD: "85"
-
-          - pipe: docker://nayaksuraj/security-pipe:1.0.0
-            variables:
-              SECRETS_SCAN: "true"
-              SCA_SCAN: "true"
-              SAST_SCAN: "true"
-              SBOM_GENERATE: "true"
-              FAIL_ON_HIGH: "true"
-
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          DOCKER_REGISTRY: $DOCKER_REGISTRY
-          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
-          DOCKER_USERNAME: $DOCKER_USERNAME
-          DOCKER_PASSWORD: $DOCKER_PASSWORD
-          IMAGE_TAG: "${BITBUCKET_COMMIT:0:7}"
-          SCAN_IMAGE: "true"
-          PUSH_IMAGE: "true"
-
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
-        variables:
-          ENVIRONMENT: "staging"
-          NAMESPACE: "staging"
-          KUBECONFIG: $KUBECONFIG
-        trigger: manual
-
-  tags:
-    'v*':
-      - step:
-          <<: *setup-step
+          LANGUAGE: "python"
+          TYPE_CHECK_COMMAND: "poetry run mypy src --strict"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
         variables:
-          TEST_COMMAND: "poetry run pytest --cov=src --cov-fail-under=85"
+          TEST_TOOL: "pytest"
+          COVERAGE_ENABLED: "true"
+
+      - parallel:
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              SONAR_ENABLED: "true"
+              SONAR_TOKEN: $SONAR_TOKEN
+              QUALITY_GATE_ENABLED: "true"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              FAIL_ON_HIGH: "true"
+              SAST_SCAN: "true"
+              IAC_SCAN: "true"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          SCAN_IMAGE: "true"
+          TRIVY_EXIT_CODE: "1"
+
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+        variables:
+          HELM_CHART_PATH: "../../helm-chart"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+
+      - step:
+          name: 🚀 Deploy to Staging
+          deployment: staging
+          trigger: manual
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "staging"
+                DEPLOY_NAMESPACE: "staging"
+                KUBECONFIG: $KUBECONFIG_STAGING
+                HELM_CHART_PATH: "../../helm-chart"
+                HELM_VALUES_FILE: "helm-values-staging.yaml"
+
+      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+        variables:
+          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+          MESSAGE: "✅ Deployed to STAGING"
+          ENVIRONMENT: "staging"
+          STATUS: "success"
+          TITLE: "Staging Deployment"
+
+  # ==============================================================================
+  # Tagged Releases - Production Deployment
+  # ==============================================================================
+  tags:
+    'v*':
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+        variables:
+          LANGUAGE: "python"
+          TYPE_CHECK_COMMAND: "poetry run mypy src --strict --disallow-untyped-defs"
+
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          TEST_TOOL: "pytest"
+          COVERAGE_ENABLED: "true"
 
       - pipe: docker://nayaksuraj/security-pipe:1.0.0
         variables:
-          SECRETS_SCAN: "true"
-          SCA_SCAN: "true"
-          SBOM_GENERATE: "true"
           FAIL_ON_HIGH: "true"
-
-      - step:
-          name: Build Distribution
-          caches:
-            - pip
-          script:
-            - poetry build
-            - poetry export -f requirements.txt --output requirements.txt --without-hashes
-          artifacts:
-            - dist/**
-            - requirements.txt
+          SAST_SCAN: "true"
 
       - pipe: docker://nayaksuraj/docker-pipe:1.0.0
         variables:
@@ -181,34 +179,37 @@ pipelines:
           DOCKER_USERNAME: $DOCKER_USERNAME
           DOCKER_PASSWORD: $DOCKER_PASSWORD
           IMAGE_TAG: "${BITBUCKET_TAG#v}"
-          ALSO_TAG_AS_LATEST: "true"
           SCAN_IMAGE: "true"
-          PUSH_IMAGE: "true"
+          TRIVY_EXIT_CODE: "1"
 
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
         variables:
-          ENVIRONMENT: "production"
-          NAMESPACE: "production"
-          KUBECONFIG: $KUBECONFIG
-          IMAGE_TAG: "${BITBUCKET_TAG#v}"
-          WAIT_FOR_ROLLOUT: "true"
-        trigger: manual
+          HELM_CHART_PATH: "../../helm-chart"
+          CHART_VERSION: "${BITBUCKET_TAG#v}"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+          PUSH_CHART: "true"
 
-  pull-requests:
-    '**':
       - step:
-          <<: *setup-step
+          name: 🚀 Deploy to Production
+          deployment: production
+          trigger: manual
+          script:
+            - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+              variables:
+                ENVIRONMENT: "production"
+                DEPLOY_NAMESPACE: "production"
+                KUBECONFIG: $KUBECONFIG_PRODUCTION
+                HELM_CHART_PATH: "../../helm-chart"
+                HELM_VALUES_FILE: "helm-values-production.yaml"
+                DEPLOYMENT_STRATEGY: "canary"
 
-      - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
-            variables:
-              TEST_COMMAND: "poetry run pytest --cov=src"
-
-          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
-            variables:
-              LINTER: "ruff"
-
-          - pipe: docker://nayaksuraj/security-pipe:1.0.0
-            variables:
-              SECRETS_SCAN: "true"
-              SCA_SCAN: "true"
+      - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+        variables:
+          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+          MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
+          ENVIRONMENT: "production"
+          STATUS: "success"
+          TITLE: "Production Release"
+          MENTION_CHANNEL: "channel"
+          CUSTOM_FIELDS: '{"Version":"${BITBUCKET_TAG#v}","Deployment":"Canary → Full Rollout"}'
