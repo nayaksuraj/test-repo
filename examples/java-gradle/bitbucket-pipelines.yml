@@ -62,11 +62,9 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/build-pipe:1.0.0
           variables:
-            BUILD_TOOL: "gradle"
             BUILD_ARGS: "--parallel --build-cache --no-daemon -x test"
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_TOOL: "gradle"
             TEST_ARGS: "test --parallel --build-cache --no-daemon"
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"

@@ -49,7 +49,6 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_COMMAND: "npm test -- --coverage --maxWorkers=2"
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"
 
@@ -64,7 +63,6 @@ pipelines:
       - parallel:
           - pipe: docker://nayaksuraj/test-pipe:1.0.0
             variables:
-              TEST_COMMAND: "npm test -- --coverage"
               COVERAGE_ENABLED: "true"
 
           - pipe: docker://nayaksuraj/quality-pipe:1.0.0
@@ -112,7 +110,6 @@ pipelines:
       - parallel:
           - pipe: docker://nayaksuraj/test-pipe:1.0.0
             variables:
-              TEST_COMMAND: "npm test -- --coverage --ci"
               COVERAGE_ENABLED: "true"
               COVERAGE_THRESHOLD: "80"
 
@@ -178,7 +175,6 @@ pipelines:
       - parallel:
           - pipe: docker://nayaksuraj/test-pipe:1.0.0
             variables:
-              TEST_COMMAND: "npm test -- --coverage --ci"
 
           - pipe: docker://nayaksuraj/security-pipe:1.0.0
             variables:
@@ -227,7 +223,6 @@ pipelines:
       - parallel:
           - pipe: docker://nayaksuraj/test-pipe:1.0.0
             variables:
-              TEST_COMMAND: "npm test -- --coverage"
 
           - step:
               <<: *lint-step

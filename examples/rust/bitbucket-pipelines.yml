@@ -79,11 +79,9 @@ pipelines:
     - parallel:
         - pipe: docker://nayaksuraj/build-pipe:1.0.0
           variables:
-            BUILD_TOOL: "rust"
             BUILD_ARGS: "--release --all-features"
         - pipe: docker://nayaksuraj/test-pipe:1.0.0
           variables:
-            TEST_TOOL: "rust"
             TEST_ARGS: "--release --all-features"
             COVERAGE_ENABLED: "true"
             COVERAGE_THRESHOLD: "80"
