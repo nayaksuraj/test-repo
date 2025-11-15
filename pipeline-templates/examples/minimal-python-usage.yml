@@ -1,0 +1,49 @@
+# ==============================================================================
+# Minimal Python Pipeline - Uses Reusable Template
+# ==============================================================================
+# This is all you need in your project's bitbucket-pipelines.yml
+# Just 10 lines vs 500+ lines!
+# ==============================================================================
+
+# Copy the template file to your project root as bitbucket-pipelines.yml
+# OR if you have the template in a central repo, use the include syntax below
+
+# Include the reusable template (if using central repo)
+# !include pipeline-templates/python-reusable-template.yml
+
+# OR just copy-paste from python-reusable-template.yml
+# The template includes everything production-ready out of the box!
+
+# ==============================================================================
+# Configuration via Bitbucket Repository Variables
+# ==============================================================================
+# Set these in Repository Settings → Pipelines → Repository Variables:
+#
+# DOCKER_REGISTRY=docker.io
+# DOCKER_REPOSITORY=myorg/myapp
+# DOCKER_USERNAME=myuser
+# DOCKER_PASSWORD=*** (secured)
+#
+# HELM_REGISTRY=oci://ghcr.io/myorg/charts
+# HELM_REGISTRY_USERNAME=myuser
+# HELM_REGISTRY_PASSWORD=*** (secured)
+#
+# KUBECONFIG_DEV=*** (secured, base64 encoded)
+# KUBECONFIG_STAGING=*** (secured)
+# KUBECONFIG_PRODUCTION=*** (secured)
+#
+# SONAR_TOKEN=*** (secured, optional)
+# SLACK_WEBHOOK_URL=*** (secured, optional)
+# ==============================================================================
+
+# That's it! The template provides:
+# ✅ Multi-version matrix testing (Python 3.9-3.12)
+# ✅ Pre-commit hooks enforcement
+# ✅ JUnit XML + coverage reports
+# ✅ SonarQube quality gates
+# ✅ Security scanning with Cosign signing
+# ✅ SBOM generation and attachment
+# ✅ Helm chart packaging
+# ✅ Canary deployments to production
+# ✅ Slack notifications
+# ✅ Auto-fix pipeline
