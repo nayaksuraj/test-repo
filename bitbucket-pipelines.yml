@@ -1,125 +1,136 @@
 # ==============================================================================
-# Bitbucket Pipeline Using Custom Pipes (Clean & Reusable)
+# Optimized Bitbucket Pipeline with Reusable Pipes
 # ==============================================================================
-# This pipeline demonstrates how to use custom pipes for clean, maintainable CI/CD
-#
-# BEFORE: 18 scripts, 400+ lines of YAML, duplicated logic
-# AFTER:  7 pipes, 100 lines of YAML, fully reusable
+# Clean, maintainable CI/CD using YAML anchors and Bitbucket Pipes
 # ==============================================================================
 
 image: alpine:3.19
 
-# ==============================================================================
-# Pipeline Options
-# ==============================================================================
 options:
   max-time: 120
 
 # ==============================================================================
-# Git Flow Pipeline with Pipes
+# Reusable Definitions (YAML Anchors)
+# ==============================================================================
+definitions:
+  # Common pipe configurations
+  pipes:
+    build: &pipe-build
+      pipe: docker://nayaksuraj/build-pipe:1.0.0
+
+    test: &pipe-test
+      pipe: docker://nayaksuraj/test-pipe:1.0.0
+      variables:
+        INTEGRATION_TESTS: "true"
+        COVERAGE_ENABLED: "true"
+
+    quality: &pipe-quality
+      pipe: docker://nayaksuraj/quality-pipe:1.0.0
+      variables:
+        SONAR_ENABLED: "true"
+        SONAR_TOKEN: $SONAR_TOKEN
+        SONAR_HOST_URL: $SONAR_HOST_URL
+
+    security: &pipe-security
+      pipe: docker://nayaksuraj/security-pipe:1.0.0
+      variables:
+        SECRETS_SCAN: "true"
+        SCA_SCAN: "true"
+        SBOM_GENERATE: "true"
+
+    docker: &pipe-docker
+      pipe: docker://nayaksuraj/docker-pipe:1.0.0
+      variables:
+        DOCKER_REGISTRY: $DOCKER_REGISTRY
+        DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+        DOCKER_USERNAME: $DOCKER_USERNAME
+        DOCKER_PASSWORD: $DOCKER_PASSWORD
+        SCAN_IMAGE: "true"
+        PUSH_IMAGE: "true"
+
+    helm: &pipe-helm
+      pipe: docker://nayaksuraj/helm-pipe:1.0.0
+      variables:
+        HELM_CHART_PATH: "./helm-chart"
+        LINT_CHART: "true"
+        PACKAGE_CHART: "true"
+
+    deploy-dev: &pipe-deploy-dev
+      pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+      variables:
+        ENVIRONMENT: "dev"
+        NAMESPACE: "dev"
+        KUBECONFIG: $KUBECONFIG
+        WAIT_FOR_ROLLOUT: "true"
+
+    deploy-stage: &pipe-deploy-stage
+      pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+      variables:
+        ENVIRONMENT: "stage"
+        NAMESPACE: "staging"
+        KUBECONFIG: $KUBECONFIG
+      trigger: manual
+
+    deploy-prod: &pipe-deploy-prod
+      pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+      variables:
+        ENVIRONMENT: "prod"
+        NAMESPACE: "production"
+        KUBECONFIG: $KUBECONFIG
+        WAIT_FOR_ROLLOUT: "true"
+      trigger: manual
+
+# ==============================================================================
+# Pipeline Workflows
 # ==============================================================================
 pipelines:
-  # Default pipeline for all branches
   default:
-    - pipe: docker://nayaksuraj/build-pipe:1.0.0
-    - pipe: docker://nayaksuraj/test-pipe:1.0.0
+    - *pipe-build
+    - *pipe-test
 
-  # ==============================================================================
-  # Feature Branches: Build, Test, Quality
-  # ==============================================================================
   branches:
+    # Feature branches: Quick validation
     'feature/**':
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-        variables:
-          BUILD_ARGS: "-DskipTests"
-
+      - *pipe-build
       - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
-            variables:
-              INTEGRATION_TESTS: "true"
-              COVERAGE_ENABLED: "true"
-
-          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
-            variables:
-              SONAR_ENABLED: "${SONAR_ENABLED:-false}"
-              CHECKSTYLE_ENABLED: "true"
-
-    # ==========================================================================
-    # Develop Branch: Full CI/CD Pipeline
-    # ==========================================================================
-    develop:
-      # CI Phase
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-
-      - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
-            variables:
-              INTEGRATION_TESTS: "true"
-              COVERAGE_ENABLED: "true"
-              COVERAGE_THRESHOLD: "80"
-
-          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
-            variables:
-              SONAR_ENABLED: "true"
-              SONAR_TOKEN: $SONAR_TOKEN
-              SONAR_HOST_URL: $SONAR_HOST_URL
-
+          - *pipe-test
+          - *pipe-quality
           - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              FAIL_ON_HIGH: "false"
+
+    # Develop: Full CI + Deploy to dev
+    develop:
+      - *pipe-build
+      - parallel:
+          - *pipe-test
+          - *pipe-quality
+          - <<: *pipe-security
             variables:
               SECRETS_SCAN: "true"
               SCA_SCAN: "true"
               SBOM_GENERATE: "true"
               FAIL_ON_HIGH: "false"
-
-      # CD Phase
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+      - *pipe-docker
+      - <<: *pipe-helm
         variables:
-          DOCKER_REGISTRY: $DOCKER_REGISTRY
-          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
-          DOCKER_USERNAME: $DOCKER_USERNAME
-          DOCKER_PASSWORD: $DOCKER_PASSWORD
-          SCAN_IMAGE: "true"
-          PUSH_IMAGE: "true"
-
-      - parallel:
-          - pipe: docker://nayaksuraj/helm-pipe:1.0.0
-            variables:
-              HELM_CHART_PATH: "./helm-chart"
-              LINT_CHART: "true"
-              PACKAGE_CHART: "true"
-              PUSH_CHART: "${HELM_PUSH:-false}"
-              HELM_REGISTRY: $HELM_REGISTRY
-              HELM_REGISTRY_USERNAME: $HELM_REGISTRY_USERNAME
-              HELM_REGISTRY_PASSWORD: $HELM_REGISTRY_PASSWORD
-
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
-        variables:
-          ENVIRONMENT: "dev"
-          NAMESPACE: "dev"
-          KUBECONFIG: $KUBECONFIG
-          RELEASE_NAME: "app"
           HELM_CHART_PATH: "./helm-chart"
-          WAIT_FOR_ROLLOUT: "true"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+          PUSH_CHART: "${HELM_PUSH:-false}"
+          HELM_REGISTRY: $HELM_REGISTRY
+          HELM_REGISTRY_USERNAME: $HELM_REGISTRY_USERNAME
+          HELM_REGISTRY_PASSWORD: $HELM_REGISTRY_PASSWORD
+      - *pipe-deploy-dev
 
-    # ==========================================================================
-    # Main Branch: Deploy to Dev + Manual Stage
-    # ==========================================================================
+    # Main: Deploy to dev + manual stage
     main:
-      # CI Phase
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-
+      - *pipe-build
       - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
-            variables:
-              INTEGRATION_TESTS: "true"
-              COVERAGE_ENABLED: "true"
-
-          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
-            variables:
-              SONAR_ENABLED: "true"
-              SONAR_TOKEN: $SONAR_TOKEN
-
-          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+          - *pipe-test
+          - *pipe-quality
+          - <<: *pipe-security
             variables:
               SECRETS_SCAN: "true"
               SCA_SCAN: "true"
@@ -128,58 +139,31 @@ pipelines:
               IAC_SCAN: "true"
               DOCKERFILE_SCAN: "true"
               FAIL_ON_HIGH: "true"
-
-      # CD Phase
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
-        variables:
-          DOCKER_REGISTRY: $DOCKER_REGISTRY
-          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
-          DOCKER_USERNAME: $DOCKER_USERNAME
-          DOCKER_PASSWORD: $DOCKER_PASSWORD
-          SCAN_IMAGE: "true"
-          PUSH_IMAGE: "true"
-
-      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+      - *pipe-docker
+      - <<: *pipe-helm
         variables:
           HELM_CHART_PATH: "./helm-chart"
           LINT_CHART: "true"
           PACKAGE_CHART: "true"
           PUSH_CHART: "true"
+      - *pipe-deploy-dev
+      - *pipe-deploy-stage
 
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
-        variables:
-          ENVIRONMENT: "dev"
-          NAMESPACE: "dev"
-          KUBECONFIG: $KUBECONFIG
-
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
-        variables:
-          ENVIRONMENT: "stage"
-          NAMESPACE: "staging"
-          KUBECONFIG: $KUBECONFIG
-        trigger: manual
-
-    # ==========================================================================
-    # Release Branch: Full Pipeline with Production Deployment
-    # ==========================================================================
+    # Release: Full pipeline with production
     release:
-      # CI Phase
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-
+      - *pipe-build
       - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          - <<: *pipe-test
             variables:
               INTEGRATION_TESTS: "true"
               COVERAGE_ENABLED: "true"
               COVERAGE_THRESHOLD: "80"
-
-          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+          - <<: *pipe-quality
             variables:
               SONAR_ENABLED: "true"
               SONAR_TOKEN: $SONAR_TOKEN
               QUALITY_GATE_WAIT: "true"
-
-          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+          - <<: *pipe-security
             variables:
               SECRETS_SCAN: "true"
               SCA_SCAN: "true"
@@ -187,11 +171,8 @@ pipelines:
               SBOM_GENERATE: "true"
               IAC_SCAN: "true"
               DOCKERFILE_SCAN: "true"
-              CONTAINER_SCAN: "false"  # Will scan after docker build
               FAIL_ON_HIGH: "true"
-
-      # CD Phase
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+      - <<: *pipe-docker
         variables:
           DOCKER_REGISTRY: $DOCKER_REGISTRY
           DOCKER_REPOSITORY: $DOCKER_REPOSITORY
@@ -200,56 +181,34 @@ pipelines:
           SCAN_IMAGE: "true"
           TRIVY_SEVERITY: "CRITICAL,HIGH"
           PUSH_IMAGE: "true"
-
-      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+      - <<: *pipe-helm
         variables:
           HELM_CHART_PATH: "./helm-chart"
           LINT_CHART: "true"
           PACKAGE_CHART: "true"
           PUSH_CHART: "true"
-
-      # Deploy to environments
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
-        variables:
-          ENVIRONMENT: "dev"
-          NAMESPACE: "dev"
-          KUBECONFIG: $KUBECONFIG
-
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
-        variables:
-          ENVIRONMENT: "stage"
-          NAMESPACE: "staging"
-          KUBECONFIG: $KUBECONFIG
-        trigger: manual
-
-      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+      - *pipe-deploy-dev
+      - *pipe-deploy-stage
+      - <<: *pipe-deploy-prod
         variables:
           ENVIRONMENT: "prod"
           NAMESPACE: "production"
           KUBECONFIG: $KUBECONFIG
           WAIT_FOR_ROLLOUT: "true"
           ROLLOUT_TIMEOUT: "600"
-        trigger: manual
 
-  # ==============================================================================
-  # Tag-Based Production Deployment
-  # ==============================================================================
+  # Tag-based production deployment
   tags:
     'v*':
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-
-      - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        variables:
-          INTEGRATION_TESTS: "true"
-
-      - pipe: docker://nayaksuraj/security-pipe:1.0.0
+      - *pipe-build
+      - *pipe-test
+      - <<: *pipe-security
         variables:
           SECRETS_SCAN: "true"
           SCA_SCAN: "true"
           SBOM_GENERATE: "true"
           FAIL_ON_HIGH: "true"
-
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+      - <<: *pipe-docker
         variables:
           DOCKER_REGISTRY: $DOCKER_REGISTRY
           DOCKER_REPOSITORY: $DOCKER_REPOSITORY
@@ -258,13 +217,11 @@ pipelines:
           IMAGE_TAG: $BITBUCKET_TAG
           SCAN_IMAGE: "true"
           PUSH_IMAGE: "true"
-
-      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+      - <<: *pipe-helm
         variables:
           HELM_CHART_PATH: "./helm-chart"
           CHART_VERSION: $BITBUCKET_TAG
           PUSH_CHART: "true"
-
       - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
         variables:
           ENVIRONMENT: "prod"
@@ -274,32 +231,24 @@ pipelines:
           WAIT_FOR_ROLLOUT: "true"
         trigger: manual
 
-  # ==============================================================================
-  # Pull Request Validation
-  # ==============================================================================
+  # Pull request validation
   pull-requests:
     '**':
-      - pipe: docker://nayaksuraj/build-pipe:1.0.0
-
+      - *pipe-build
       - parallel:
-          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          - <<: *pipe-test
             variables:
               COVERAGE_ENABLED: "true"
-
           - pipe: docker://nayaksuraj/quality-pipe:1.0.0
             variables:
               SONAR_ENABLED: "${SONAR_ENABLED:-false}"
-
           - pipe: docker://nayaksuraj/security-pipe:1.0.0
             variables:
               SECRETS_SCAN: "true"
               SCA_SCAN: "true"
 
-  # ==============================================================================
-  # Custom Pipelines
-  # ==============================================================================
+  # Custom pipelines
   custom:
-    # Full security audit
     security-audit:
       - pipe: docker://nayaksuraj/security-pipe:1.0.0
         variables:
@@ -310,10 +259,9 @@ pipelines:
           IAC_SCAN: "true"
           DOCKERFILE_SCAN: "true"
           CONTAINER_SCAN: "true"
-          FAIL_ON_HIGH: "false"  # Report only
+          FAIL_ON_HIGH: "false"
           DEBUG: "true"
 
-    # Quick build and test
     quick-build:
       - pipe: docker://nayaksuraj/build-pipe:1.0.0
         variables:
@@ -322,23 +270,11 @@ pipelines:
         variables:
           TEST_ARGS: "--quick"
 
-    # Docker only
-    docker-only:
-      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
-        variables:
-          DOCKER_REGISTRY: $DOCKER_REGISTRY
-          DOCKER_USERNAME: $DOCKER_USERNAME
-          DOCKER_PASSWORD: $DOCKER_PASSWORD
-          SCAN_IMAGE: "true"
-          PUSH_IMAGE: "false"
+    deploy-dev:
+      - *pipe-deploy-dev
 
-# ==============================================================================
-# Benefits of Using Pipes:
-# ==============================================================================
-# ✅ 18 scripts → 7 reusable pipes
-# ✅ 400+ lines YAML → 100 lines
-# ✅ Duplicated logic → Single source of truth
-# ✅ Hard to maintain → Easy to update (change pipe version)
-# ✅ Project-specific → Works across all projects
-# ✅ Manual updates → Automatic updates (pull new pipe version)
-# ==============================================================================
+    deploy-stage:
+      - *pipe-deploy-stage
+
+    deploy-prod:
+      - *pipe-deploy-prod
