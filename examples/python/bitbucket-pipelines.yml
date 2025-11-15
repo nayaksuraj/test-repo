@@ -186,6 +186,9 @@ pipelines:
         variables:
           HELM_CHART_PATH: "../../helm-chart"
           CHART_VERSION: "${BITBUCKET_TAG#v}"
+          HELM_REGISTRY: $HELM_REGISTRY
+          HELM_REGISTRY_USERNAME: $HELM_REGISTRY_USERNAME
+          HELM_REGISTRY_PASSWORD: $HELM_REGISTRY_PASSWORD
           LINT_CHART: "true"
           PACKAGE_CHART: "true"
           PUSH_CHART: "true"
