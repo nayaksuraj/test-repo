@@ -1,0 +1,164 @@
+# Example Helm values for Java Maven Spring Boot application
+# Use with the root helm-chart directory:
+# helm install myapp ../../helm-chart -f helm-values-example.yaml
+
+replicaCount: 2
+
+image:
+  repository: myorg/java-maven-app
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+nameOverride: "java-maven-app"
+fullnameOverride: "my-java-app"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/actuator/prometheus"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: java-app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: java-app-tls
+      hosts:
+        - java-app.example.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Spring Boot specific health checks
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Spring Boot JVM configuration
+env:
+  - name: JAVA_OPTS
+    value: "-Xmx768m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication"
+  - name: SPRING_PROFILES_ACTIVE
+    value: "production"
+  - name: SERVER_PORT
+    value: "8080"
+  - name: MANAGEMENT_SERVER_PORT
+    value: "8080"
+  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+    value: "health,info,prometheus,metrics"
+
+# Spring Boot configuration
+configMap:
+  enabled: true
+  data:
+    application.yaml: |
+      server:
+        port: 8080
+        shutdown: graceful
+      spring:
+        lifecycle:
+          timeout-per-shutdown-phase: 30s
+      management:
+        endpoints:
+          web:
+            exposure:
+              include: health,info,prometheus,metrics
+        health:
+          probes:
+            enabled: true
+        endpoint:
+          health:
+            show-details: always
+            probes:
+              enabled: true
+        metrics:
+          export:
+            prometheus:
+              enabled: true
+
+# Database secrets (example - replace with actual secrets)
+secrets:
+  enabled: true
+  data:
+    spring.datasource.password: cGFzc3dvcmQxMjM=  # base64 encoded
+
+persistence:
+  enabled: false
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - java-maven-app
+          topologyKey: kubernetes.io/hostname
