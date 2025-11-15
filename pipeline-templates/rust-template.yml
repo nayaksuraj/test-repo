@@ -1,17 +1,22 @@
 # ==============================================================================
-# Python Project - Using Template from nayaksuraj/test-repo
+# Rust Pipeline Template - Complete Reusable Pipeline
 # ==============================================================================
-# This pipeline uses the Python template from nayaksuraj/test-repo
+# This template can be used by any Rust project by copying it or referencing
+# it from nayaksuraj/test-repo
 #
-# To use this template in your repository:
-# 1. Copy pipeline-templates/python-template.yml from nayaksuraj/test-repo
-# 2. Paste as bitbucket-pipelines.yml in your repo
-# 3. Configure required Bitbucket variables (see template file)
-#
-# Template source: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/python-template.yml
+# Usage: Copy this file to your repo as bitbucket-pipelines.yml and configure
+# the required Bitbucket variables (see bottom of file)
 # ==============================================================================
 
-image: python:3.11-slim
+image: rust:1.75-slim
+
+clone:
+  depth: 50
+  lfs: false
+
+definitions:
+  caches:
+    cargo: ~/.cargo/registry
 
 pipelines:
   # ==============================================================================
@@ -21,14 +26,12 @@ pipelines:
     '**':
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          # Auto-detects Python - no LANGUAGE variable needed!
           PRE_COMMIT_ENABLED: "true"
           LOCKFILE_CHECK: "true"
           LINT_ENABLED: "true"
           TYPE_CHECK_ENABLED: "true"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
           COVERAGE_ENABLED: "true"
 
@@ -50,11 +53,8 @@ pipelines:
   branches:
     develop:
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
-        variables:
-          # Auto-detects Python - no LANGUAGE variable needed!
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
           COVERAGE_ENABLED: "true"
 
@@ -82,8 +82,6 @@ pipelines:
           ENVIRONMENT: "dev"
           DEPLOY_NAMESPACE: "development"
           KUBECONFIG: $KUBECONFIG_DEV
-          HELM_CHART_PATH: "../../helm-chart"
-          HELM_VALUES_FILE: "helm-values-dev.yaml"
 
       - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
@@ -99,11 +97,9 @@ pipelines:
     main:
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          # Auto-detects Python - no LANGUAGE variable needed!
-          TYPE_CHECK_COMMAND: "poetry run mypy src --strict"
+          TYPE_CHECK_COMMAND: "cargo clippy -- -D warnings"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
           COVERAGE_ENABLED: "true"
 
@@ -131,7 +127,6 @@ pipelines:
 
       - pipe: docker://nayaksuraj/helm-pipe:1.0.0
         variables:
-          HELM_CHART_PATH: "../../helm-chart"
           LINT_CHART: "true"
           PACKAGE_CHART: "true"
 
@@ -145,8 +140,6 @@ pipelines:
                 ENVIRONMENT: "staging"
                 DEPLOY_NAMESPACE: "staging"
                 KUBECONFIG: $KUBECONFIG_STAGING
-                HELM_CHART_PATH: "../../helm-chart"
-                HELM_VALUES_FILE: "helm-values-staging.yaml"
 
       - pipe: docker://nayaksuraj/notify-pipe:1.0.0
         variables:
@@ -164,11 +157,9 @@ pipelines:
     'v*':
       - pipe: docker://nayaksuraj/lint-pipe:1.0.0
         variables:
-          # Auto-detects Python - no LANGUAGE variable needed!
-          TYPE_CHECK_COMMAND: "poetry run mypy src --strict --disallow-untyped-defs"
+          TYPE_CHECK_COMMAND: "cargo clippy --all-targets -- -D warnings"
 
       - pipe: docker://nayaksuraj/test-pipe:1.0.0
-        # Auto-detects pytest from pyproject.toml - no TEST_TOOL needed!
         variables:
           COVERAGE_ENABLED: "true"
 
@@ -189,7 +180,6 @@ pipelines:
 
       - pipe: docker://nayaksuraj/helm-pipe:1.0.0
         variables:
-          HELM_CHART_PATH: "../../helm-chart"
           CHART_VERSION: "${BITBUCKET_TAG#v}"
           HELM_REGISTRY: $HELM_REGISTRY
           HELM_REGISTRY_USERNAME: $HELM_REGISTRY_USERNAME
@@ -208,8 +198,6 @@ pipelines:
                 ENVIRONMENT: "production"
                 DEPLOY_NAMESPACE: "production"
                 KUBECONFIG: $KUBECONFIG_PRODUCTION
-                HELM_CHART_PATH: "../../helm-chart"
-                HELM_VALUES_FILE: "helm-values-production.yaml"
                 DEPLOYMENT_STRATEGY: "canary"
 
       - pipe: docker://nayaksuraj/notify-pipe:1.0.0
@@ -222,3 +210,19 @@ pipelines:
           TITLE: "Production Release"
           MENTION_CHANNEL: "channel"
           CUSTOM_FIELDS: '{"Version":"${BITBUCKET_TAG#v}","Deployment":"Canary → Full Rollout"}'
+
+# ==============================================================================
+# Required Bitbucket Variables (mark as secured where indicated)
+# ==============================================================================
+# DOCKER_REGISTRY           - Docker registry URL (e.g., ghcr.io)
+# DOCKER_REPOSITORY         - Docker repository name
+# DOCKER_USERNAME           - Docker registry username (secured)
+# DOCKER_PASSWORD           - Docker registry password/token (secured)
+# KUBECONFIG_DEV            - Kubernetes config for dev environment (secured)
+# KUBECONFIG_STAGING        - Kubernetes config for staging environment (secured)
+# KUBECONFIG_PRODUCTION     - Kubernetes config for production environment (secured)
+# SLACK_WEBHOOK_URL         - Slack webhook URL (secured)
+# SONAR_TOKEN               - SonarQube/SonarCloud token (secured) (optional)
+# HELM_REGISTRY             - Helm chart registry URL (optional)
+# HELM_REGISTRY_USERNAME    - Helm registry username (secured) (optional)
+# HELM_REGISTRY_PASSWORD    - Helm registry password (secured) (optional)

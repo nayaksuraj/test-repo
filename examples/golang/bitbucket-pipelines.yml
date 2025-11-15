@@ -1,15 +1,14 @@
 # ==============================================================================
-# Production-Ready Go Pipeline
+# Go Project - Using Template from nayaksuraj/test-repo
 # ==============================================================================
-# Based on Google, Uber, and HashiCorp best practices for Go CI/CD
-# Features:
-# - Go modules with vendor caching
-# - Race detection and benchmarks
-# - golangci-lint with comprehensive checks
-# - Code coverage with go test
-# - Security scanning (gosec, govulncheck)
-# - Minimal Docker images with multi-stage builds
-# - Cross-platform builds
+# This pipeline uses the Go template from nayaksuraj/test-repo
+#
+# To use this template in your repository:
+# 1. Copy pipeline-templates/golang-template.yml from nayaksuraj/test-repo
+# 2. Paste as bitbucket-pipelines.yml in your repo
+# 3. Configure required Bitbucket variables (see template file)
+#
+# Template source: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/golang-template.yml
 # ==============================================================================
 
 image: golang:1.21-alpine

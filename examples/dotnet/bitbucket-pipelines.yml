@@ -1,16 +1,14 @@
 # ==============================================================================
-# Production-Ready .NET Pipeline
+# .NET Project - Using Template from nayaksuraj/test-repo
 # ==============================================================================
-# Based on Microsoft, Stack Overflow, and GitHub best practices for .NET CI/CD
-# Features:
-# - Multi-target framework support (.NET 6, 7, 8)
-# - NuGet package caching
-# - xUnit/NUnit test execution with coverage
-# - Code coverage with Coverlet
-# - SonarQube integration
-# - Security scanning (OWASP, Trivy)
-# - Docker multi-stage builds
-# - Kubernetes deployment
+# This pipeline uses the .NET template from nayaksuraj/test-repo
+#
+# To use this template in your repository:
+# 1. Copy pipeline-templates/dotnet-template.yml from nayaksuraj/test-repo
+# 2. Paste as bitbucket-pipelines.yml in your repo
+# 3. Configure required Bitbucket variables (see template file)
+#
+# Template source: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/dotnet-template.yml
 # ==============================================================================
 
 image: mcr.microsoft.com/dotnet/sdk:8.0

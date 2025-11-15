@@ -1,64 +1,67 @@
-# Reusable Pipeline Templates
+# Pipeline Templates - Ready for Production
 
-This directory contains production-ready, reusable CI/CD pipeline templates for all supported languages.
+This directory contains production-ready, language-specific CI/CD pipeline templates that can be used by ANY repository. These templates are built using Bitbucket Pipes from nayaksuraj/test-repo and follow industry best practices.
 
 ## 📋 Available Templates
 
-| Language | Template File | Status |
-|----------|--------------|--------|
-| Python | `python-reusable-template.yml` | ✅ Production-Ready |
-| Java (Maven) | `java-maven-reusable-template.yml` | 🔄 Coming Soon |
-| Java (Gradle) | `java-gradle-reusable-template.yml` | 🔄 Coming Soon |
-| Node.js | `nodejs-reusable-template.yml` | 🔄 Coming Soon |
-| Go | `go-reusable-template.yml` | 🔄 Coming Soon |
-| .NET | `dotnet-reusable-template.yml` | 🔄 Coming Soon |
-| Rust | `rust-reusable-template.yml` | 🔄 Coming Soon |
-| Ruby | `ruby-reusable-template.yml` | 🔄 Coming Soon |
-| PHP | `php-reusable-template.yml` | 🔄 Coming Soon |
+| Language | Template File | Image | Status |
+|----------|--------------|-------|--------|
+| Python | `python-template.yml` | `python:3.11-slim` | ✅ Production-Ready |
+| Java (Maven) | `java-maven-template.yml` | `maven:3.9-openjdk-17` | ✅ Production-Ready |
+| Java (Gradle) | `java-gradle-template.yml` | `gradle:8-jdk17` | ✅ Production-Ready |
+| Node.js | `nodejs-template.yml` | `node:20-slim` | ✅ Production-Ready |
+| Go | `golang-template.yml` | `golang:1.21` | ✅ Production-Ready |
+| .NET | `dotnet-template.yml` | `mcr.microsoft.com/dotnet/sdk:8.0` | ✅ Production-Ready |
+| Rust | `rust-template.yml` | `rust:1.75-slim` | ✅ Production-Ready |
+| Ruby | `ruby-template.yml` | `ruby:3.2-slim` | ✅ Production-Ready |
+| PHP | `php-template.yml` | `php:8.2-cli` | ✅ Production-Ready |
 
 ## 🚀 Quick Start
 
-### Option 1: Direct Copy (Recommended for Most Projects)
+### How to Use These Templates in Your Repository
+
+**Step 1**: Copy the template for your language from nayaksuraj/test-repo
 
 ```bash
-# Copy template to your project
-cp pipeline-templates/python-reusable-template.yml bitbucket-pipelines.yml
+# For Python projects
+curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/python-template.yml
 
-# Configure Bitbucket repository variables (see below)
-# Commit and push
+# For Java Maven projects
+curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/java-maven-template.yml
+
+# Or manually copy from: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/
 ```
 
-### Option 2: Reference from Central Repository
+**Step 2**: Configure required Bitbucket variables in your repository
 
-If you have a central pipeline repository:
-
-```yaml
-# bitbucket-pipelines.yml in your project
-repositories:
-  pipeline-templates:
-    git: git@bitbucket.org:yourorg/pipeline-templates.git
-
-image: python:3.12-slim
-
-definitions:
-  # Import the template
-  !include pipeline-templates/python-reusable-template.yml
-
-# Override only what you need
-pipelines:
-  default:
-    - step:
-        name: Custom Step
-        script:
-          - echo "Project-specific logic"
+```
+Repository Settings → Pipelines → Repository variables
 ```
 
-### Option 3: Fork and Customize
+Add these variables (see template comments for complete list):
+- `DOCKER_REGISTRY`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` (secured)
+- `KUBECONFIG_DEV`, `KUBECONFIG_STAGING`, `KUBECONFIG_PRODUCTION` (secured)
+- `SLACK_WEBHOOK_URL` (secured)
+- `SONAR_TOKEN` (secured, optional)
+
+**Step 3**: Commit and push
 
 ```bash
-# Fork this repository
-# Customize templates for your organization
-# Teams reference your forked templates
+git add bitbucket-pipelines.yml
+git commit -m "Add CI/CD pipeline from nayaksuraj/test-repo"
+git push
+```
+
+Your pipeline will automatically run on the next push!
+
+### Alternative: Organization Template Repository
+
+For organizations, you can fork this repository and customize templates for your needs:
+
+```bash
+# Fork nayaksuraj/test-repo to yourorg/pipeline-templates
+# Customize templates with org-specific defaults
+# Teams copy templates from yourorg/pipeline-templates
 ```
 
 ## 🔧 Configuration
@@ -95,35 +98,22 @@ SONAR_TOKEN=***  # Mark as secured
 SLACK_WEBHOOK_URL=https://hooks.slack.com/...  # Mark as secured
 ```
 
-### Template Variables
+### Pipeline Customization
 
-Each template supports customization via environment variables:
+All templates use Bitbucket Pipes which accept variables for customization. Common variables you can override:
 
-#### Python Template
+| Pipe | Common Variables | Example |
+|------|------------------|---------|
+| `lint-pipe` | `TYPE_CHECK_COMMAND`, `PRE_COMMIT_ENABLED` | `TYPE_CHECK_COMMAND: "mypy src --strict"` |
+| `test-pipe` | `COVERAGE_ENABLED`, `COVERAGE_THRESHOLD` | `COVERAGE_ENABLED: "true"` |
+| `quality-pipe` | `SONAR_ENABLED`, `SONAR_TOKEN` | `SONAR_ENABLED: "true"` |
+| `security-pipe` | `FAIL_ON_HIGH`, `SAST_SCAN`, `SCA_SCAN` | `FAIL_ON_HIGH: "true"` |
+| `docker-pipe` | `SCAN_IMAGE`, `TRIVY_EXIT_CODE` | `SCAN_IMAGE: "true"` |
+| `helm-pipe` | `LINT_CHART`, `PACKAGE_CHART`, `PUSH_CHART` | `PUSH_CHART: "true"` |
+| `deploy-pipe` | `ENVIRONMENT`, `DEPLOYMENT_STRATEGY` | `DEPLOYMENT_STRATEGY: "canary"` |
+| `notify-pipe` | `CHANNELS`, `MESSAGE`, `STATUS` | `CHANNELS: "slack,email"` |
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PYTHON_VERSIONS` | `3.9 3.10 3.11 3.12` | Python versions for matrix |
-| `COVERAGE_THRESHOLD` | `85` | Minimum coverage percentage |
-| `HELM_CHART_PATH` | `../../helm-chart` | Path to helm chart |
-| `MYPY_FLAGS` | `--strict` | mypy type checking flags |
-| `SONAR_ENABLED` | `true` | Enable SonarQube scanning |
-| `SECURITY_FAIL_ON_HIGH` | `false` (PRs), `true` (main/tags) | Fail on HIGH security issues |
-| `TRIVY_SEVERITY` | `HIGH,CRITICAL` | Trivy scan severity levels |
-| `HELM_PUSH` | `true` | Push helm chart to registry |
-
-You can override these in your bitbucket-pipelines.yml:
-
-```yaml
-pipelines:
-  branches:
-    main:
-      - step:
-          name: Override Coverage
-          script:
-            - export COVERAGE_THRESHOLD=90
-            - # Rest of template steps
-```
+See each pipe's README in `/bitbucket-pipes/` for complete variable documentation.
 
 ## 📁 Project Structure
 
@@ -187,177 +177,180 @@ All templates include:
 - Clear error messages
 - Downloadable artifacts
 
-## 📖 Template Anatomy
+## 📖 Template Structure
 
-Each template follows this structure:
+Each template follows this standardized structure:
 
 ```yaml
-# 1. Configuration Section
-image: {language}:{version}
-options: {max-time, etc}
-definitions:
-  caches: {...}
-  services: {...}
+# 1. Base Configuration
+image: {language-specific-image}
+clone:
+  depth: 50
+  lfs: false
 
-# 2. Reusable Step Definitions
 definitions:
-  steps:
-    lint-check: &lint-check             # ✅ Uses lint-pipe (pre-commit, linting, type check)
-    unit-test: &unit-test               # Manual (advanced pytest features)
-    quality-scan: &quality-scan         # ✅ Uses quality-pipe
-    security-scan: &security-scan       # ✅ Uses security-pipe
-    docker-build: &docker-build         # ✅ Uses docker-pipe
-    cosign-sign-sbom: &cosign-sign-sbom # Image signing (not yet in pipes)
-    helm-package: &helm-package         # ✅ Uses helm-pipe
-    deploy: &deploy                     # ✅ Uses deploy-pipe
-    notify: &notify                     # ✅ Uses notify-pipe
+  caches:
+    {language-cache}: {cache-path}  # e.g., pip: ~/.cache/pip
 
-# 3. Pipeline Definitions
+# 2. Pipeline Definitions (using Bitbucket Pipes)
 pipelines:
-  pull-requests: {...}      # Fast feedback for PRs
+  pull-requests:        # Fast feedback for PRs
+    '**':
+      - pipe: lint-pipe
+      - pipe: test-pipe
+      - parallel:
+          - pipe: quality-pipe
+          - pipe: security-pipe
+
   branches:
-    develop: {...}          # Auto-deploy to dev
-    main: {...}             # Deploy to staging
-  tags: {...}               # Production releases
-  custom: {...}             # Auto-fix, security-audit
+    develop:            # Auto-deploy to dev
+      - pipe: lint-pipe
+      - pipe: test-pipe
+      - parallel:
+          - pipe: quality-pipe
+          - pipe: security-pipe
+      - pipe: docker-pipe
+      - pipe: deploy-pipe
+      - pipe: notify-pipe
+
+    main:               # Deploy to staging (manual)
+      - pipe: lint-pipe (stricter)
+      - pipe: test-pipe
+      - parallel:
+          - pipe: quality-pipe (with gates)
+          - pipe: security-pipe (fail on high)
+      - pipe: docker-pipe
+      - pipe: helm-pipe
+      - step: manual staging deployment
+      - pipe: notify-pipe
+
+  tags:
+    'v*':              # Production release (manual)
+      - pipe: lint-pipe (strictest)
+      - pipe: test-pipe
+      - pipe: security-pipe
+      - pipe: docker-pipe (with version tag)
+      - pipe: helm-pipe (push to registry)
+      - step: manual production deployment (canary)
+      - pipe: notify-pipe
 ```
 
-### 🔌 Bitbucket Pipes Integration
+### 🔌 Bitbucket Pipes Used
 
-Templates leverage organizational **Bitbucket Pipes** to eliminate duplicate code and tool installation:
+Templates leverage **9 organizational Bitbucket Pipes** to eliminate duplicate code:
 
-| Step | Pipe Used | What It Does | Duplicates Eliminated |
-|------|-----------|--------------|----------------------|
-| **lint-check** | `lint-pipe:1.0.0` | Pre-commit hooks, linting, formatting, type checking | Manual pip/poetry/pre-commit installation, repeated in every step |
-| **quality-scan** | `quality-pipe:1.0.0` | SonarQube analysis | Manual SonarQube scanner installation |
-| **security-scan** | `security-pipe:1.0.0` | Secrets, SCA, SAST scanning | Manual installation of multiple security tools |
-| **docker-build** | `docker-pipe:1.0.0` | Docker build + Trivy scan + push | Manual Docker commands, Trivy installation |
-| **helm-package** | `helm-pipe:1.0.0` | Helm lint, package, push | Manual Helm commands |
-| **deploy** | `deploy-pipe:1.0.0` | Kubernetes deployment | Manual kubectl/helm deploy logic |
-| **notify** | `notify-pipe:1.0.0` | Rich Slack notifications | Manual curl/JSON formatting |
+| Pipe | Purpose | Benefits |
+|------|---------|----------|
+| `lint-pipe` | Pre-commit hooks, linting, formatting, type checking | Auto-detects language, no tool installation |
+| `test-pipe` | Unit tests, coverage reports | Auto-detects test framework |
+| `quality-pipe` | SonarQube/SonarCloud analysis | Pre-installed scanner |
+| `security-pipe` | Secrets, SCA, SAST, SBOM scanning | Multiple tools in one pipe |
+| `docker-pipe` | Build, scan, tag, push Docker images | BuildKit + Trivy included |
+| `helm-pipe` | Lint, package, push Helm charts | Supports OCI registries |
+| `deploy-pipe` | Kubernetes/Helm deployments | Canary, blue-green strategies |
+| `notify-pipe` | Multi-channel notifications | Slack, Email, Teams, Discord, Webhooks |
+| `build-pipe` | Language-agnostic builds | Auto-detects build system |
 
-**Benefits**:
-- ✅ **No duplicate tool installation** - pipes have tools pre-installed
-- ✅ **Consistent versioning** - all projects use same tool versions
-- ✅ **Faster pipelines** - no download/install time
-- ✅ **Single source of truth** - update pipe once, affects all templates
-- ✅ **Smaller YAML** - complex logic encapsulated in pipes
-
-**Cosign image signing** is currently manual in templates (not yet integrated into docker-pipe). Future enhancement: add signing support to docker-pipe.
+**Key Benefits**:
+- ✅ **Zero code duplication** - all logic in pipes
+- ✅ **Auto-detection** - no need to specify language/tools
+- ✅ **Consistent** - same versions across all projects
+- ✅ **Fast** - pre-installed tools, no download time
+- ✅ **Maintainable** - update pipe once, affects all users
 
 ## 🔄 Customization Examples
 
-### Example 1: Override Python Versions
+### Example 1: Stricter Type Checking
 
 ```yaml
-# bitbucket-pipelines.yml
-!include pipeline-templates/python-reusable-template.yml
-
-# Override matrix to only test Python 3.11 and 3.12
-pipelines:
-  pull-requests:
-    '**':
-      - step: *pre-checks
-      - parallel:
-          - step: {<<: *unit-test, name: "Tests 3.11", image: python:3.11-slim}
-          - step: {<<: *unit-test, name: "Tests 3.12", image: python:3.12-slim}
+# Override type check command for Python
+- pipe: docker://nayaksuraj/lint-pipe:1.0.0
+  variables:
+    TYPE_CHECK_COMMAND: "mypy src --strict --disallow-any-expr"
 ```
 
-### Example 2: Add Custom Step
+### Example 2: Multiple Notification Channels
 
 ```yaml
-# bitbucket-pipelines.yml
-!include pipeline-templates/python-reusable-template.yml
-
-pipelines:
-  branches:
-    main:
-      - step: *pre-checks
-      - parallel: {steps from template}
-
-      # Add custom step
-      - step:
-          name: 📦 Publish to PyPI
-          script:
-            - poetry build
-            - poetry publish --username $PYPI_USERNAME --password $PYPI_PASSWORD
+# Send notifications to Slack + Email
+- pipe: docker://nayaksuraj/notify-pipe:1.0.0
+  variables:
+    CHANNELS: "slack,email"
+    SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+    EMAIL_TO: "team@company.com"
+    EMAIL_SMTP_HOST: $EMAIL_SMTP_HOST
+    EMAIL_SMTP_USERNAME: $EMAIL_USERNAME
+    EMAIL_SMTP_PASSWORD: $EMAIL_PASSWORD
+    MESSAGE: "✅ Deployed to production"
 ```
 
-### Example 3: Different Helm Chart Path
+### Example 3: Custom Helm Chart Location
 
 ```yaml
-# bitbucket-pipelines.yml
-!include pipeline-templates/python-reusable-template.yml
-
-# Override helm chart path
-pipelines:
-  branches:
-    main:
-      - step:
-          <<: *helm-package
-          variables:
-            HELM_CHART_PATH: "./k8s/helm-chart"
+# Different helm chart path
+- pipe: docker://nayaksuraj/helm-pipe:1.0.0
+  variables:
+    HELM_CHART_PATH: "./k8s/helm"
+    LINT_CHART: "true"
+    PACKAGE_CHART: "true"
 ```
 
-### Example 4: Disable SonarQube
+### Example 4: Disable Quality Gates for PRs
 
 ```yaml
-# bitbucket-pipelines.yml
-!include pipeline-templates/python-reusable-template.yml
-
-# Disable SonarQube in quality scan
-pipelines:
-  pull-requests:
-    '**':
-      - step:
-          <<: *quality-scan
-          variables:
-            SONAR_ENABLED: "false"
+# Optional quality checks for PRs
+pull-requests:
+  '**':
+    - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+      variables:
+        SONAR_ENABLED: "false"  # Disable for faster PR feedback
 ```
 
-## 🎨 Creating Organization-Specific Templates
+## 🎨 Organization-Specific Templates
 
-To create templates for your organization:
+To create customized templates for your organization:
 
 ### 1. Fork This Repository
 
 ```bash
+# Fork nayaksuraj/test-repo to yourorg/pipeline-templates
 git clone git@bitbucket.org:yourorg/pipeline-templates.git
 cd pipeline-templates
 ```
 
-### 2. Customize Default Values
+### 2. Customize Templates
 
-Edit the template files to match your org standards:
+Edit template files in `pipeline-templates/` to match your org standards:
 
 ```yaml
-# Example: Change default coverage threshold
-definitions:
-  steps:
-    unit-test: &unit-test
-      step:
-        script:
-          - poetry run coverage report --fail-under=${COVERAGE_THRESHOLD:-90}  # Changed from 85 to 90
+# Example: Stricter defaults for your org
+- pipe: docker://nayaksuraj/lint-pipe:1.0.0
+  variables:
+    TYPE_CHECK_COMMAND: "mypy src --strict --disallow-any-unimported"  # Stricter
+    PRE_COMMIT_ENABLED: "true"  # Always required
+
+- pipe: docker://nayaksuraj/test-pipe:1.0.0
+  variables:
+    COVERAGE_ENABLED: "true"
+    COVERAGE_THRESHOLD: "90"  # Higher than default
 ```
 
-### 3. Add Organization-Specific Steps
+### 3. Update Bitbucket Pipes (Optional)
 
-```yaml
-definitions:
-  steps:
-    compliance-check: &compliance-check
-      step:
-        name: 🔒 Compliance Check
-        script:
-          - ./scripts/check-compliance.sh
-          - ./scripts/audit-dependencies.sh
+You can also fork the pipes themselves and customize:
+
+```bash
+# Fork bitbucket-pipes to yourorg/custom-pipes
+# Publish to Docker Hub as yourorg/lint-pipe:1.0.0
+# Update templates to use yourorg/* pipes
 ```
 
 ### 4. Share with Teams
 
+Teams copy templates from your forked repository:
+
 ```bash
-# Teams reference your org template
-!include git@bitbucket.org:yourorg/pipeline-templates/python-reusable-template.yml
+curl -o bitbucket-pipelines.yml https://bitbucket.org/yourorg/pipeline-templates/raw/main/pipeline-templates/python-template.yml
 ```
 
 ## 🚦 Pipeline Flow
@@ -439,6 +432,8 @@ To contribute improvements to these templates:
 
 ---
 
-**Status**: Python Template Production-Ready ✅
-**Maintained By**: DevOps Team
+**Status**: All 9 Language Templates Production-Ready ✅
+**Languages**: Python, Java (Maven/Gradle), Node.js, Go, .NET, Rust, Ruby, PHP
+**Pipes**: 9 organizational pipes (lint, test, quality, security, docker, helm, deploy, notify, build)
+**Repository**: https://bitbucket.org/nayaksuraj/test-repo
 **Last Updated**: 2025-11-15
