@@ -21,6 +21,12 @@ Production-ready, reusable Bitbucket Pipes for building, testing, securing, and 
 | [helm-pipe](./CD/helm-pipe/) | Lint, package, and push Helm charts | 1.0.0 | ✅ Ready |
 | [deploy-pipe](./CD/deploy-pipe/) | Deploy to Kubernetes (dev/stage/prod) | 1.0.0 | ✅ Ready |
 
+### Notification Pipes
+
+| Pipe | Purpose | Version | Status |
+|------|---------|---------|--------|
+| [slack-pipe](./slack-pipe/) | Send rich Slack notifications with deployment status | 1.0.0 | ✅ Ready |
+
 ## 🚀 Quick Start
 
 ### Simple Pipeline with Pipes
@@ -65,6 +71,14 @@ pipelines:
       variables:
         ENVIRONMENT: "dev"
         KUBECONFIG: $KUBECONFIG
+
+    # Notify - Slack notification
+    - pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      variables:
+        SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+        MESSAGE: "✅ Deployed to dev successfully"
+        ENVIRONMENT: "dev"
+        STATUS: "success"
 ```
 
 ## 📚 Documentation
