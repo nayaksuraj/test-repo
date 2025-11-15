@@ -106,39 +106,50 @@ definitions:
         SBOM_FORMAT: "cyclonedx-json"
         FAIL_ON_HIGH: "${SECURITY_FAIL_ON_HIGH:-false}"
 
-    docker-build-sign: &docker-build-sign
+    # ==========================================================================
+    # Docker Build, Scan & Push (Uses docker-pipe - eliminates duplicate tool installation)
+    # ==========================================================================
+    docker-build: &docker-build
+      pipe: docker://nayaksuraj/docker-pipe:1.0.0
+      variables:
+        DOCKER_REGISTRY: $DOCKER_REGISTRY
+        DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+        DOCKER_USERNAME: $DOCKER_USERNAME
+        DOCKER_PASSWORD: $DOCKER_PASSWORD
+        IMAGE_TAG: "${IMAGE_TAG:-${BITBUCKET_COMMIT:0:7}}"
+        DOCKERFILE_PATH: "./Dockerfile"
+        BUILD_ARGS: "VERSION=${IMAGE_TAG:-${BITBUCKET_COMMIT:0:7}},BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ'),VCS_REF=${BITBUCKET_COMMIT}"
+        SCAN_IMAGE: "true"
+        TRIVY_SEVERITY: "${TRIVY_SEVERITY:-CRITICAL,HIGH}"
+        TRIVY_EXIT_CODE: "${TRIVY_EXIT_CODE:-0}"
+        PUSH_IMAGE: "true"
+        DEBUG: "false"
+
+    # ==========================================================================
+    # Image Signing & SBOM Attachment (Cosign - not yet in docker-pipe)
+    # ==========================================================================
+    cosign-sign-sbom: &cosign-sign-sbom
       step:
-        name: 🐳 Build & Sign Image
-        services: [docker]
+        name: 🔐 Sign Image & Attach SBOM
         script:
           - export IMAGE_TAG="${IMAGE_TAG:-${BITBUCKET_COMMIT:0:7}}"
           - export IMAGE_FULL="$DOCKER_REGISTRY/$DOCKER_REPOSITORY:$IMAGE_TAG"
 
-          # Install tools
+          # Install Cosign and Syft (only tools not in docker-pipe)
           - curl -LO https://github.com/sigstore/cosign/releases/download/v2.2.2/cosign-linux-amd64
           - chmod +x cosign-linux-amd64 && mv cosign-linux-amd64 /usr/local/bin/cosign
           - curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-          # Build
-          - docker build
-              --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-              --build-arg VCS_REF=$BITBUCKET_COMMIT
-              --label org.opencontainers.image.revision=$BITBUCKET_COMMIT
-              -t $IMAGE_FULL .
-
-          # SBOM
+          # Generate SBOM
+          - echo "📦 Generating SBOM..."
           - syft $IMAGE_FULL -o cyclonedx-json > sbom-${IMAGE_TAG}.json
 
-          # Scan
-          - trivy image --severity ${TRIVY_SEVERITY:-HIGH,CRITICAL} --exit-code ${TRIVY_EXIT_CODE:-0} $IMAGE_FULL
-
-          # Push
-          - echo "$DOCKER_PASSWORD" | docker login $DOCKER_REGISTRY -u "$DOCKER_USERNAME" --password-stdin
-          - docker push $IMAGE_FULL
-
-          # Sign
+          # Sign image with Cosign (keyless)
+          - echo "✍️ Signing image with Cosign..."
           - cosign sign --yes $IMAGE_FULL
+
+          # Attach SBOM to image
+          - echo "📎 Attaching SBOM to image..."
           - cosign attach sbom --sbom sbom-${IMAGE_TAG}.json $IMAGE_FULL
         artifacts:
           - sbom-*.json
@@ -241,7 +252,11 @@ pipelines:
               variables:
                 FAIL_ON_HIGH: "false"
 
-      - step: *docker-build-sign
+      # Docker build, scan, and push using docker-pipe
+      - step: *docker-build
+
+      # Sign image and attach SBOM
+      - step: *cosign-sign-sbom
 
       - step:
           <<: *deploy
@@ -287,10 +302,14 @@ pipelines:
                 SAST_SCAN: "true"
                 IAC_SCAN: "true"
 
+      # Docker build, scan, and push (fail on vulnerabilities in main branch)
       - step:
-          <<: *docker-build-sign
+          <<: *docker-build
           variables:
             TRIVY_EXIT_CODE: "1"
+
+      # Sign image and attach SBOM
+      - step: *cosign-sign-sbom
 
       - step: *helm-package
 
@@ -340,11 +359,18 @@ pipelines:
               variables:
                 FAIL_ON_HIGH: "true"
 
+      # Docker build, scan, and push with version tag
       - step:
-          <<: *docker-build-sign
+          <<: *docker-build
           variables:
             IMAGE_TAG: "${BITBUCKET_TAG#v}"
             TRIVY_EXIT_CODE: "1"
+
+      # Sign image and attach SBOM
+      - step:
+          <<: *cosign-sign-sbom
+          variables:
+            IMAGE_TAG: "${BITBUCKET_TAG#v}"
 
       # Also tag as latest
       - step:

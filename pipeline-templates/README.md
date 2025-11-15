@@ -204,10 +204,12 @@ definitions:
   steps:
     pre-checks: &pre-checks {...}
     unit-test: &unit-test {...}
-    quality-scan: &quality-scan {...}
-    security-scan: &security-scan {...}
-    docker-build-sign: &docker-build-sign {...}
-    deploy: &deploy {...}
+    quality-scan: &quality-scan         # ✅ Uses quality-pipe
+    security-scan: &security-scan       # ✅ Uses security-pipe
+    docker-build: &docker-build         # ✅ Uses docker-pipe
+    cosign-sign-sbom: &cosign-sign-sbom # Image signing (not yet in pipes)
+    helm-package: &helm-package         # ✅ Uses helm-pipe
+    deploy: &deploy                     # ✅ Uses deploy-pipe
     notify: &notify {...}
 
 # 3. Pipeline Definitions
@@ -219,6 +221,27 @@ pipelines:
   tags: {...}               # Production releases
   custom: {...}             # Auto-fix, security-audit
 ```
+
+### 🔌 Bitbucket Pipes Integration
+
+Templates leverage organizational **Bitbucket Pipes** to eliminate duplicate code and tool installation:
+
+| Step | Pipe Used | What It Does | Duplicates Eliminated |
+|------|-----------|--------------|----------------------|
+| **quality-scan** | `quality-pipe:1.0.0` | SonarQube analysis | Manual SonarQube scanner installation |
+| **security-scan** | `security-pipe:1.0.0` | Secrets, SCA, SAST scanning | Manual installation of multiple security tools |
+| **docker-build** | `docker-pipe:1.0.0` | Docker build + Trivy scan + push | Manual Docker commands, Trivy installation |
+| **helm-package** | `helm-pipe:1.0.0` | Helm lint, package, push | Manual Helm commands |
+| **deploy** | `deploy-pipe:1.0.0` | Kubernetes deployment | Manual kubectl/helm deploy logic |
+
+**Benefits**:
+- ✅ **No duplicate tool installation** - pipes have tools pre-installed
+- ✅ **Consistent versioning** - all projects use same tool versions
+- ✅ **Faster pipelines** - no download/install time
+- ✅ **Single source of truth** - update pipe once, affects all templates
+- ✅ **Smaller YAML** - complex logic encapsulated in pipes
+
+**Cosign image signing** is currently manual in templates (not yet integrated into docker-pipe). Future enhancement: add signing support to docker-pipe.
 
 ## 🔄 Customization Examples
 
