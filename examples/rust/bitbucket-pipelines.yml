@@ -1,0 +1,276 @@
+# ==============================================================================
+# Production-Ready Rust Pipeline
+# ==============================================================================
+# Based on Mozilla, Cloudflare, and Rust Foundation best practices for Rust CI/CD
+# Features:
+# - Cargo workspace support
+# - Clippy linting with deny warnings
+# - cargo-audit security scanning
+# - Code coverage with tarpaulin/llvm-cov
+# - Cross-compilation support
+# - Minimal Alpine Docker images
+# - Kubernetes deployment
+# ==============================================================================
+
+image: rust:1.75
+
+definitions:
+  caches:
+    cargo: ~/.cargo
+    cargo-target: target
+
+  services:
+    docker:
+      memory: 2048
+
+  steps:
+    build: &build-step
+      step:
+        name: Build & Unit Tests
+        caches:
+          - cargo
+          - cargo-target
+        script:
+          # Update Rust toolchain
+          - rustup update stable
+          - rustc --version
+
+          # Format check
+          - rustup component add rustfmt
+          - cargo fmt --all -- --check
+
+          # Lint with Clippy
+          - rustup component add clippy
+          - cargo clippy --all-targets --all-features -- -D warnings
+
+          # Build
+          - cargo build --release --all-features
+
+          # Run tests
+          - cargo test --release --all-features
+
+          # Generate code coverage
+          - cargo install cargo-tarpaulin
+          - cargo tarpaulin --out Xml --output-dir ./coverage --all-features --release
+        artifacts:
+          - target/release/my-app
+          - coverage/**
+
+    quality: &quality-step
+      step:
+        name: Code Quality & Security
+        caches:
+          - cargo
+        script:
+          # Install tools
+          - cargo install cargo-audit cargo-outdated cargo-bloat
+
+          # Security audit
+          - cargo audit
+
+          # Check for outdated dependencies
+          - cargo outdated --exit-code 1 || true
+
+          # Analyze binary size
+          - cargo bloat --release -n 10
+
+pipelines:
+  default:
+    - parallel:
+        - pipe: docker://nayaksuraj/build-pipe:1.0.0
+          variables:
+            BUILD_TOOL: "rust"
+            BUILD_ARGS: "--release --all-features"
+        - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          variables:
+            TEST_TOOL: "rust"
+            TEST_ARGS: "--release --all-features"
+            COVERAGE_ENABLED: "true"
+            COVERAGE_THRESHOLD: "80"
+
+  branches:
+    develop:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "false"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          DOCKERFILE: "Dockerfile"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG
+
+    main:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              IAC_SCAN: "true"
+              DOCKERFILE_SCAN: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Integration Tests
+          services:
+            - docker
+          caches:
+            - cargo
+          script:
+            - cargo test --release --test integration_tests
+          artifacts:
+            - target/release/integration_tests
+
+      - step:
+          name: Cross-Platform Builds
+          caches:
+            - cargo
+          script:
+            # Install cross-compilation tool
+            - cargo install cross
+
+            # Build for multiple platforms
+            - cross build --release --target x86_64-unknown-linux-musl
+            - cross build --release --target aarch64-unknown-linux-musl
+          artifacts:
+            - target/x86_64-unknown-linux-musl/release/my-app
+            - target/aarch64-unknown-linux-musl/release/my-app
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_COMMIT:0:7}"
+          SCAN_IMAGE: "true"
+          TRIVY_SEVERITY: "CRITICAL,HIGH"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+        variables:
+          HELM_CHART_PATH: "./helm-chart"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+          PUSH_CHART: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG
+          WAIT_FOR_ROLLOUT: "true"
+        trigger: manual
+
+  tags:
+    'v*':
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Release Build
+          caches:
+            - cargo
+          script:
+            # Update version in Cargo.toml
+            - export VERSION=${BITBUCKET_TAG#v}
+            - sed -i "s/^version = .*/version = \"$VERSION\"/" Cargo.toml
+
+            # Build optimized release
+            - cargo build --release --all-features
+            - strip target/release/my-app
+
+            # Create checksum
+            - sha256sum target/release/my-app > target/release/my-app.sha256
+          artifacts:
+            - target/release/my-app
+            - target/release/my-app.sha256
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          ALSO_TAG_AS_LATEST: "true"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          WAIT_FOR_ROLLOUT: "true"
+          ROLLOUT_TIMEOUT: "600"
+        trigger: manual
+
+  pull-requests:
+    '**':
+      - step:
+          <<: *build-step
+
+      - pipe: docker://nayaksuraj/security-pipe:1.0.0
+        variables:
+          SECRETS_SCAN: "true"
+          SCA_SCAN: "true"
+
+  custom:
+    benchmark:
+      - step:
+          name: Performance Benchmarks
+          caches:
+            - cargo
+          script:
+            - cargo bench --all-features
+
+    publish-crate:
+      - step:
+          name: Publish to crates.io
+          caches:
+            - cargo
+          script:
+            - cargo login $CARGO_REGISTRY_TOKEN
+            - cargo publish --all-features

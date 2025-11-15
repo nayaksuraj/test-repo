@@ -1,0 +1,278 @@
+# ==============================================================================
+# Production-Ready Ruby Pipeline
+# ==============================================================================
+# Based on GitHub, Shopify, and Basecamp best practices for Ruby CI/CD
+# Features:
+# - Bundler dependency management
+# - RSpec parallel test execution
+# - SimpleCov code coverage
+# - RuboCop linting with auto-correct
+# - Brakeman security scanning
+# - Rails-specific optimizations
+# - Docker multi-stage builds
+# - Kubernetes deployment
+# ==============================================================================
+
+image: ruby:3.3
+
+definitions:
+  caches:
+    bundler: vendor/bundle
+    rubocop: ~/.cache/rubocop_cache
+
+  services:
+    docker:
+      memory: 2048
+    postgres:
+      image: postgres:16
+      environment:
+        POSTGRES_DB: test
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+
+  steps:
+    build: &build-step
+      step:
+        name: Build & Unit Tests
+        caches:
+          - bundler
+        services:
+          - postgres
+        script:
+          # Install dependencies
+          - bundle config set --local path 'vendor/bundle'
+          - bundle install --jobs=4 --retry=3
+
+          # Database setup (Rails)
+          - bundle exec rake db:create db:schema:load RAILS_ENV=test
+
+          # Run RuboCop
+          - bundle exec rubocop --parallel --format progress
+
+          # Run RSpec with coverage
+          - bundle exec rspec --format progress --format RspecJunitFormatter --out test-results/rspec.xml
+        artifacts:
+          - coverage/**
+          - test-results/**
+
+    quality: &quality-step
+      step:
+        name: Code Quality & Security
+        caches:
+          - bundler
+          - rubocop
+        script:
+          # Install bundler-audit
+          - gem install bundler-audit
+
+          # Security audit for dependencies
+          - bundle audit check --update
+
+          # Brakeman security scanner (Rails apps)
+          - gem install brakeman
+          - brakeman --no-pager --format json --output brakeman-report.json || true
+
+          # Code quality metrics
+          - gem install rubycritic
+          - rubycritic --no-browser --format json
+        artifacts:
+          - brakeman-report.json
+          - tmp/rubycritic/**
+
+pipelines:
+  default:
+    - parallel:
+        - pipe: docker://nayaksuraj/build-pipe:1.0.0
+          variables:
+            BUILD_TOOL: "ruby"
+            BUILD_ARGS: "--jobs=4"
+        - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          variables:
+            TEST_TOOL: "ruby"
+            TEST_COMMAND: "bundle exec rspec"
+            COVERAGE_ENABLED: "true"
+            COVERAGE_THRESHOLD: "80"
+
+  branches:
+    develop:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "false"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          BUILD_ARGS: "--build-arg RAILS_ENV=production"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG
+
+    main:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              IAC_SCAN: "true"
+              DOCKERFILE_SCAN: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Integration Tests
+          services:
+            - docker
+            - postgres
+          caches:
+            - bundler
+          script:
+            - bundle exec rspec --tag type:integration
+          artifacts:
+            - test-results/**
+
+      - step:
+          name: System Tests (Rails)
+          services:
+            - docker
+          caches:
+            - bundler
+          script:
+            # Install Chrome for system tests
+            - apt-get update && apt-get install -y chromium chromium-driver
+            - bundle exec rails test:system
+          artifacts:
+            - tmp/screenshots/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_COMMIT:0:7}"
+          SCAN_IMAGE: "true"
+          TRIVY_SEVERITY: "CRITICAL,HIGH"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+        variables:
+          HELM_CHART_PATH: "./helm-chart"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+          PUSH_CHART: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG
+          WAIT_FOR_ROLLOUT: "true"
+        trigger: manual
+
+  tags:
+    'v*':
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Release Build
+          caches:
+            - bundler
+          script:
+            - export VERSION=${BITBUCKET_TAG#v}
+            - bundle install --deployment --without development test
+            - bundle exec rake assets:precompile RAILS_ENV=production
+          artifacts:
+            - public/assets/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          ALSO_TAG_AS_LATEST: "true"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          WAIT_FOR_ROLLOUT: "true"
+          ROLLOUT_TIMEOUT: "600"
+        trigger: manual
+
+  pull-requests:
+    '**':
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              LINTER: "rubocop"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+
+  custom:
+    performance-test:
+      - step:
+          name: Load Testing with Siege
+          services:
+            - docker
+          script:
+            - apt-get update && apt-get install -y siege
+            - siege -c 100 -t 30s http://localhost:3000
+
+    publish-gem:
+      - step:
+          name: Publish to RubyGems
+          caches:
+            - bundler
+          script:
+            - gem build *.gemspec
+            - gem push *.gem --key $RUBYGEMS_API_KEY

@@ -1,0 +1,256 @@
+# ==============================================================================
+# Production-Ready Node.js Pipeline
+# ==============================================================================
+# Based on Airbnb, Uber, and PayPal best practices for Node.js CI/CD
+# Features:
+# - npm/yarn support with dependency caching
+# - ESLint + Prettier code quality
+# - Jest unit & integration tests with coverage
+# - E2E tests with Playwright/Cypress
+# - Security scanning (npm audit, Snyk)
+# - Docker layer caching
+# - Zero-downtime deployments
+# ==============================================================================
+
+image: node:20-alpine
+
+definitions:
+  caches:
+    npm: ~/.npm
+    node: node_modules
+
+  steps:
+    install: &install-step
+      step:
+        name: Install Dependencies
+        caches:
+          - node
+          - npm
+        script:
+          - npm ci --prefer-offline
+        artifacts:
+          - node_modules/**
+
+    lint: &lint-step
+      step:
+        name: Lint & Format Check
+        caches:
+          - node
+        script:
+          - npm run lint
+          - npm run format:check
+          - npm run type-check
+
+pipelines:
+  default:
+    - step:
+        <<: *install-step
+
+    - parallel:
+        - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          variables:
+            TEST_COMMAND: "npm test -- --coverage --maxWorkers=2"
+            COVERAGE_ENABLED: "true"
+            COVERAGE_THRESHOLD: "80"
+
+        - step:
+            <<: *lint-step
+
+  branches:
+    develop:
+      - step:
+          <<: *install-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              TEST_COMMAND: "npm test -- --coverage"
+              COVERAGE_ENABLED: "true"
+
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              SONAR_ENABLED: "true"
+              SONAR_TOKEN: $SONAR_TOKEN
+              LINTER: "eslint"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SBOM_GENERATE: "true"
+
+      - step:
+          name: Build Application
+          caches:
+            - node
+          script:
+            - npm run build
+          artifacts:
+            - dist/**
+            - build/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          DOCKERFILE: "Dockerfile"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG
+
+    main:
+      - step:
+          <<: *install-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              TEST_COMMAND: "npm test -- --coverage --ci"
+              COVERAGE_ENABLED: "true"
+              COVERAGE_THRESHOLD: "80"
+
+          - step:
+              <<: *lint-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: E2E Tests
+          services:
+            - docker
+          caches:
+            - node
+          script:
+            - npm run test:e2e
+          artifacts:
+            - test-results/**
+            - screenshots/**
+
+      - step:
+          name: Build Production
+          caches:
+            - node
+          script:
+            - NODE_ENV=production npm run build
+            - npm prune --production
+          artifacts:
+            - dist/**
+            - node_modules/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_COMMIT:0:7}"
+          BUILD_ARGS: "--build-arg NODE_ENV=production"
+          SCAN_IMAGE: "true"
+          TRIVY_SEVERITY: "CRITICAL,HIGH"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG
+          WAIT_FOR_ROLLOUT: "true"
+        trigger: manual
+
+  tags:
+    'v*':
+      - step:
+          <<: *install-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              TEST_COMMAND: "npm test -- --coverage --ci"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Build Release
+          caches:
+            - node
+          script:
+            - NODE_ENV=production npm run build
+            - npm prune --production
+            - echo "${BITBUCKET_TAG}" > dist/version.txt
+          artifacts:
+            - dist/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          ALSO_TAG_AS_LATEST: "true"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          WAIT_FOR_ROLLOUT: "true"
+          ROLLOUT_TIMEOUT: "600"
+        trigger: manual
+
+  pull-requests:
+    '**':
+      - step:
+          <<: *install-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              TEST_COMMAND: "npm test -- --coverage"
+
+          - step:
+              <<: *lint-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+
+  custom:
+    lighthouse-audit:
+      - step:
+          name: Lighthouse Performance Audit
+          services:
+            - docker
+          script:
+            - npm run lighthouse
+
+    bundle-analysis:
+      - step:
+          name: Bundle Size Analysis
+          caches:
+            - node
+          script:
+            - npm run build
+            - npm run analyze

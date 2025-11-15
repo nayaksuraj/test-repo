@@ -1,0 +1,264 @@
+# ==============================================================================
+# Production-Ready .NET Pipeline
+# ==============================================================================
+# Based on Microsoft, Stack Overflow, and GitHub best practices for .NET CI/CD
+# Features:
+# - Multi-target framework support (.NET 6, 7, 8)
+# - NuGet package caching
+# - xUnit/NUnit test execution with coverage
+# - Code coverage with Coverlet
+# - SonarQube integration
+# - Security scanning (OWASP, Trivy)
+# - Docker multi-stage builds
+# - Kubernetes deployment
+# ==============================================================================
+
+image: mcr.microsoft.com/dotnet/sdk:8.0
+
+definitions:
+  caches:
+    dotnet: ~/.nuget/packages
+    sonar: ~/.sonar/cache
+
+  services:
+    docker:
+      memory: 2048
+
+  steps:
+    build: &build-step
+      step:
+        name: Build & Unit Tests
+        caches:
+          - dotnet
+        script:
+          # Restore dependencies
+          - dotnet restore --no-cache
+
+          # Build solution
+          - dotnet build --configuration Release --no-restore
+
+          # Run tests with coverage
+          - dotnet test --configuration Release --no-build --no-restore \
+              --logger "trx;LogFileName=test-results.trx" \
+              /p:CollectCoverage=true \
+              /p:CoverletOutputFormat=opencover \
+              /p:CoverletOutput=./coverage/ \
+              /p:Threshold=80 \
+              /p:ThresholdType=line
+        artifacts:
+          - "**/bin/Release/**/*.dll"
+          - "**/bin/Release/**/*.exe"
+          - "**/coverage/**"
+          - "**/TestResults/**/*.trx"
+
+    quality: &quality-step
+      step:
+        name: Code Quality Analysis
+        caches:
+          - dotnet
+          - sonar
+        script:
+          # Install SonarScanner
+          - dotnet tool install --global dotnet-sonarscanner
+
+          # Begin SonarQube analysis
+          - dotnet sonarscanner begin \
+              /k:"$SONAR_PROJECT_KEY" \
+              /o:"$SONAR_ORGANIZATION" \
+              /d:sonar.host.url="$SONAR_HOST_URL" \
+              /d:sonar.login="$SONAR_TOKEN" \
+              /d:sonar.cs.opencover.reportsPaths="**/coverage/coverage.opencover.xml"
+
+          # Build
+          - dotnet build --configuration Release
+
+          # End SonarQube analysis
+          - dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
+
+pipelines:
+  default:
+    - parallel:
+        - pipe: docker://nayaksuraj/build-pipe:1.0.0
+          variables:
+            BUILD_TOOL: "dotnet"
+            BUILD_ARGS: "--configuration Release"
+        - pipe: docker://nayaksuraj/test-pipe:1.0.0
+          variables:
+            TEST_TOOL: "dotnet"
+            TEST_ARGS: "--configuration Release --no-build"
+            COVERAGE_ENABLED: "true"
+            COVERAGE_THRESHOLD: "80"
+
+  branches:
+    develop:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "false"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          BUILD_ARGS: "--build-arg CONFIGURATION=Release"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG
+
+    main:
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              IAC_SCAN: "true"
+              DOCKERFILE_SCAN: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Integration Tests
+          services:
+            - docker
+          caches:
+            - dotnet
+          script:
+            - dotnet test --configuration Release --no-build \
+                --filter "Category=Integration" \
+                --logger "trx;LogFileName=integration-test-results.trx"
+          artifacts:
+            - "**/TestResults/**/*.trx"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_COMMIT:0:7}"
+          SCAN_IMAGE: "true"
+          TRIVY_SEVERITY: "CRITICAL,HIGH"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+        variables:
+          HELM_CHART_PATH: "./helm-chart"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+          PUSH_CHART: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG
+          WAIT_FOR_ROLLOUT: "true"
+        trigger: manual
+
+  tags:
+    'v*':
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - step:
+              <<: *quality-step
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              SAST_SCAN: "true"
+              SBOM_GENERATE: "true"
+              FAIL_ON_HIGH: "true"
+
+      - step:
+          name: Release Build
+          caches:
+            - dotnet
+          script:
+            - export VERSION=${BITBUCKET_TAG#v}
+            - dotnet build --configuration Release /p:Version=$VERSION
+            - dotnet publish --configuration Release --no-build -o ./publish
+          artifacts:
+            - publish/**
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          ALSO_TAG_AS_LATEST: "true"
+          SCAN_IMAGE: "true"
+          PUSH_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          WAIT_FOR_ROLLOUT: "true"
+          ROLLOUT_TIMEOUT: "600"
+        trigger: manual
+
+  pull-requests:
+    '**':
+      - step:
+          <<: *build-step
+
+      - parallel:
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              SONAR_ENABLED: "true"
+              SONAR_TOKEN: $SONAR_TOKEN
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+
+  custom:
+    performance-test:
+      - step:
+          name: Load Testing with NBomber
+          services:
+            - docker
+          caches:
+            - dotnet
+          script:
+            - dotnet test --filter "Category=Performance"
+
+    package-nuget:
+      - step:
+          name: Create NuGet Package
+          caches:
+            - dotnet
+          script:
+            - dotnet pack --configuration Release -o ./packages
+            - dotnet nuget push ./packages/*.nupkg --api-key $NUGET_API_KEY --source https://api.nuget.org/v3/index.json
