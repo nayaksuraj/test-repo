@@ -177,23 +177,20 @@ definitions:
         HELM_CHART_PATH: "${HELM_CHART_PATH:-../../helm-chart}"
         HELM_VALUES_FILE: "${HELM_VALUES_FILE}"
 
+    # ==========================================================================
+    # Slack Notification (Uses slack-pipe - eliminates manual curl/formatting)
+    # ==========================================================================
     notify: &notify
-      step:
-        name: 📢 Notify
-        script:
-          - |
-            if [ -n "$SLACK_WEBHOOK_URL" ]; then
-              curl -X POST $SLACK_WEBHOOK_URL -H 'Content-Type: application/json' -d '{
-                "text": "'"${NOTIFY_MESSAGE:-✅ Deployment complete}"'",
-                "blocks": [{
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*'"${NOTIFY_TITLE:-Deployment}"'*\n• Environment: '"${DEPLOY_ENV}"'\n• Commit: '"${BITBUCKET_COMMIT:0:7}"'\n• Branch: '"${BITBUCKET_BRANCH}"'"
-                  }
-                }]
-              }'
-            fi
+      pipe: docker://nayaksuraj/slack-pipe:1.0.0
+      variables:
+        SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+        MESSAGE: "${MESSAGE:-✅ Deployment completed successfully}"
+        TITLE: "${TITLE:-Bitbucket Pipeline}"
+        STATUS: "${STATUS:-success}"
+        ENVIRONMENT: "${DEPLOY_ENV}"
+        INCLUDE_COMMIT_INFO: "true"
+        INCLUDE_BUILD_INFO: "true"
+        DEBUG: "false"
 
 pipelines:
   # ==============================================================================
@@ -269,8 +266,9 @@ pipelines:
       - step:
           <<: *notify
           variables:
-            NOTIFY_MESSAGE: "✅ Deployed to DEV"
+            MESSAGE: "✅ Deployed to DEV"
             DEPLOY_ENV: "dev"
+            STATUS: "success"
 
     # ==============================================================================
     # Main Branch Pipeline
@@ -331,8 +329,10 @@ pipelines:
       - step:
           <<: *notify
           variables:
-            NOTIFY_MESSAGE: "✅ Deployed to STAGING"
+            MESSAGE: "✅ Deployed to STAGING"
             DEPLOY_ENV: "staging"
+            STATUS: "success"
+            TITLE: "Staging Deployment"
 
   # ==============================================================================
   # Tagged Release Pipeline
@@ -428,8 +428,12 @@ pipelines:
       - step:
           <<: *notify
           variables:
-            NOTIFY_MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
+            MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
             DEPLOY_ENV: "production"
+            STATUS: "success"
+            TITLE: "Production Release"
+            MENTION_CHANNEL: "channel"
+            CUSTOM_FIELDS: '{"Version":"${BITBUCKET_TAG#v}","Deployment":"Canary → Full Rollout"}'
 
   # ==============================================================================
   # Custom Pipelines
