@@ -13,6 +13,96 @@ Battle-tested CI/CD pipeline for PHP projects (Laravel, Symfony, WordPress), bas
 ✅ **Docker Multi-stage** - Optimized PHP-FPM images
 ✅ **Kubernetes Deployment** - Helm charts with rollback
 
+## Pipeline Flow Diagram
+
+```mermaid
+graph TB
+    Start([Git Commit/Push]) --> Branch{Branch Type?}
+
+    Branch -->|feature/*| F1[composer install<br/>--optimize-autoloader]
+    F1 --> F2[PHPCS PSR-12<br/>phpcs --standard=PSR12]
+    F2 --> F3[PHPUnit Tests<br/>+ Coverage]
+    F3 --> FEnd([End])
+
+    Branch -->|develop| D1[composer install<br/>+ dependencies]
+    D1 --> D2{Parallel}
+    D2 --> D3[Quality<br/>PHPStan + Psalm]
+    D2 --> D4[Security<br/>composer audit]
+    D3 --> D5[Docker Build<br/>PHP-FPM + Nginx]
+    D4 --> D5
+    D5 --> D6[Push to Registry]
+    D6 --> D7[Deploy to Dev]
+    D7 --> DEnd([Auto Deployed])
+
+    Branch -->|main| M1[composer install<br/>+ PHPUnit]
+    M1 --> M2{Parallel}
+    M2 --> M3[Quality<br/>PHPStan Level 8]
+    M2 --> M4[Security<br/>Full Audit]
+    M3 --> M5[Integration Tests<br/>Laravel Feature]
+    M4 --> M5
+    M5 --> M6[Laravel Cache<br/>config + route + view]
+    M6 --> M7[Docker Build & Scan]
+    M7 --> M8{Manual Approval}
+    M8 -->|Approved| M9[Deploy to Staging]
+    M9 --> MEnd([Deployed to Staging])
+    M8 -->|Rejected| MReject([Deployment Cancelled])
+
+    Branch -->|v*| T1[composer install<br/>--no-dev]
+    T1 --> T2{Parallel}
+    T2 --> T3[Quality Gates]
+    T2 --> T4[Security Audit]
+    T3 --> T5[Laravel Optimize<br/>All Caches]
+    T4 --> T5
+    T5 --> T6[Docker Build<br/>Production Bundle]
+    T6 --> T7[Tag Latest + Version]
+    T7 --> T8{Manual Approval}
+    T8 -->|Approved| T9[Deploy to Production]
+    T9 --> T10[Health Check<br/>+ Artisan Check]
+    T10 --> TEnd([Production Live])
+    T8 -->|Rejected| TReject([Release Cancelled])
+
+    style Start fill:#90EE90
+    style DEnd fill:#87CEEB
+    style MEnd fill:#FFA500
+    style TEnd fill:#FF6347
+    style FEnd fill:#D3D3D3
+    style MReject fill:#FF0000
+    style TReject fill:#FF0000
+
+    style D2 fill:#FFE4B5
+    style M2 fill:#FFE4B5
+    style T2 fill:#FFE4B5
+    style M8 fill:#FFD700
+    style T8 fill:#FFD700
+```
+
+### Pipeline Stages Explained
+
+| Stage | Description | Duration | Failure Impact |
+|-------|-------------|----------|----------------|
+| **Build & Test** | composer install + PHPUnit tests | ~3-5 min | ❌ Pipeline stops |
+| **Quality Check** | PHPStan level 8 + Psalm | ~2-4 min | ❌ Pipeline stops |
+| **Security Scan** | composer audit + Trivy | ~2-3 min | ⚠️ Warning (develop), ❌ Fail (main/tags) |
+| **Integration Tests** | Laravel Feature tests | ~5-8 min | ❌ Pipeline stops |
+| **Laravel Cache** | config, route, view caching | ~1-2 min | ❌ Pipeline stops |
+| **Docker Build** | PHP-FPM + Nginx multi-stage | ~4-6 min | ❌ Pipeline stops |
+| **Deploy to Dev** | Auto-deploy to development | ~3-4 min | ⚠️ Warning only |
+| **Deploy to Staging** | Manual approval required | ~4-6 min | ❌ Rollback triggered |
+| **Deploy to Production** | Manual approval + health check | ~10-15 min | ❌ Auto rollback |
+
+### Composer Cache Benefits
+
+- **First build**: ~6-10 minutes
+- **With cache**: ~2-3 minutes (70% faster)
+- **Incremental**: ~30-60 seconds
+
+### Laravel Optimization Benefits
+
+- **Config cache**: 10x faster config loading
+- **Route cache**: 5x faster routing
+- **View cache**: 3x faster view rendering
+- **Autoloader optimization**: 30% faster class loading
+
 ## Required Configuration
 
 ### 1. composer.json

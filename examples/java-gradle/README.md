@@ -13,6 +13,89 @@ Battle-tested CI/CD pipeline for Java projects using Gradle, based on best pract
 ✅ **Docker Multi-stage** - Optimized container images
 ✅ **Kubernetes Deployment** - Helm charts with rollback
 
+## Pipeline Flow Diagram
+
+```mermaid
+graph TB
+    Start([Git Commit/Push]) --> Branch{Branch Type?}
+
+    Branch -->|feature/*| F1[Build & Test]
+    F1 --> F2[Quality Analysis]
+    F2 --> F3[Security Scan]
+    F3 --> FEnd([End])
+
+    Branch -->|develop| D1[Build & Test<br/>--parallel --build-cache]
+    D1 --> D2{Parallel}
+    D2 --> D3[SonarQube Analysis]
+    D2 --> D4[Security Scan<br/>OWASP + Trivy]
+    D3 --> D5[Docker Build & Scan]
+    D4 --> D5
+    D5 --> D6[Push to Registry]
+    D6 --> D7[Deploy to Dev]
+    D7 --> DEnd([Auto Deployed])
+
+    Branch -->|main| M1[Build & Test<br/>--parallel --build-cache]
+    M1 --> M2{Parallel}
+    M2 --> M3[SonarQube Analysis]
+    M2 --> M4[Security Scan<br/>Full Suite]
+    M3 --> M5[Integration Tests<br/>TestContainers]
+    M4 --> M5
+    M5 --> M6[Docker Build & Scan]
+    M6 --> M7[Helm Package & Lint]
+    M7 --> M8{Manual Approval}
+    M8 -->|Approved| M9[Deploy to Staging]
+    M9 --> MEnd([Deployed to Staging])
+    M8 -->|Rejected| MReject([Deployment Cancelled])
+
+    Branch -->|v*| T1[Release Build<br/>with Version]
+    T1 --> T2{Parallel}
+    T2 --> T3[Quality Analysis]
+    T2 --> T4[Security Scan]
+    T3 --> T5[Gradle Build<br/>-Pversion=x.y.z]
+    T4 --> T5
+    T5 --> T6[Docker Build<br/>Multi-arch]
+    T6 --> T7[Tag Latest + Version]
+    T7 --> T8{Manual Approval}
+    T8 -->|Approved| T9[Deploy to Production]
+    T9 --> T10[Health Check<br/>10min timeout]
+    T10 --> TEnd([Production Live])
+    T8 -->|Rejected| TReject([Release Cancelled])
+
+    style Start fill:#90EE90
+    style DEnd fill:#87CEEB
+    style MEnd fill:#FFA500
+    style TEnd fill:#FF6347
+    style FEnd fill:#D3D3D3
+    style MReject fill:#FF0000
+    style TReject fill:#FF0000
+
+    style D2 fill:#FFE4B5
+    style M2 fill:#FFE4B5
+    style T2 fill:#FFE4B5
+    style M8 fill:#FFD700
+    style T8 fill:#FFD700
+```
+
+### Pipeline Stages Explained
+
+| Stage | Description | Duration | Failure Impact |
+|-------|-------------|----------|----------------|
+| **Build & Test** | Gradle build with cache, parallel tests | ~2-4 min | ❌ Pipeline stops |
+| **Quality Analysis** | SonarQube code quality, JaCoCo coverage | ~2-3 min | ❌ Pipeline stops |
+| **Security Scan** | Secrets, OWASP, dependency check | ~2-4 min | ⚠️ Warning (develop), ❌ Fail (main/tags) |
+| **Integration Tests** | Gradle integrationTest task | ~5-10 min | ❌ Pipeline stops |
+| **Docker Build** | Multi-stage build, layer caching | ~3-5 min | ❌ Pipeline stops |
+| **Helm Package** | Chart validation and packaging | ~1 min | ❌ Pipeline stops |
+| **Deploy to Dev** | Auto-deploy to development | ~2-3 min | ⚠️ Warning only |
+| **Deploy to Staging** | Manual approval required | ~3-5 min | ❌ Rollback triggered |
+| **Deploy to Production** | Manual approval, health checks | ~10-15 min | ❌ Auto rollback |
+
+### Build Cache Benefits
+
+- **First build**: ~8-10 minutes
+- **With cache**: ~2-3 minutes (75% faster)
+- **Incremental**: ~30-60 seconds
+
 ## Required Configuration
 
 ### 1. build.gradle.kts (Kotlin DSL)
