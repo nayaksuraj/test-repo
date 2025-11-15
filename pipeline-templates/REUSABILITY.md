@@ -178,6 +178,24 @@ These are identical across all projects:
 8. **Notification** ✅
    - Slack webhooks
 
+### 🔌 Organizational Pipes - Eliminating Nested Duplication
+
+The templates themselves use **organizational Bitbucket Pipes** to avoid duplicating tool installation and complex logic:
+
+| Template Step | Uses Pipe | Eliminates |
+|---------------|-----------|------------|
+| Quality Scan | `quality-pipe:1.0.0` | SonarQube scanner installation/configuration |
+| Security Scan | `security-pipe:1.0.0` | Installation of secrets scanner, SCA tools, SAST tools |
+| Docker Build | `docker-pipe:1.0.0` | Docker build logic, Trivy installation/scan, registry push |
+| Helm Package | `helm-pipe:1.0.0` | Helm lint/package/push logic |
+| Deploy | `deploy-pipe:1.0.0` | Kubernetes deployment scripts |
+
+**Two Levels of Reusability**:
+1. **Projects reuse templates** (96% reduction in YAML duplication)
+2. **Templates reuse pipes** (eliminates tool installation duplication within templates)
+
+**Result**: Templates are DRY, projects are DRY, and the entire pipeline ecosystem is maintainable and consistent.
+
 ### Requires Customization (Project-Specific)
 
 These vary by project:
