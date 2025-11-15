@@ -202,8 +202,8 @@ definitions:
 # 2. Reusable Step Definitions
 definitions:
   steps:
-    pre-checks: &pre-checks {...}
-    unit-test: &unit-test {...}
+    lint-check: &lint-check             # ✅ Uses lint-pipe (pre-commit, linting, type check)
+    unit-test: &unit-test               # Manual (advanced pytest features)
     quality-scan: &quality-scan         # ✅ Uses quality-pipe
     security-scan: &security-scan       # ✅ Uses security-pipe
     docker-build: &docker-build         # ✅ Uses docker-pipe
@@ -228,6 +228,7 @@ Templates leverage organizational **Bitbucket Pipes** to eliminate duplicate cod
 
 | Step | Pipe Used | What It Does | Duplicates Eliminated |
 |------|-----------|--------------|----------------------|
+| **lint-check** | `lint-pipe:1.0.0` | Pre-commit hooks, linting, formatting, type checking | Manual pip/poetry/pre-commit installation, repeated in every step |
 | **quality-scan** | `quality-pipe:1.0.0` | SonarQube analysis | Manual SonarQube scanner installation |
 | **security-scan** | `security-pipe:1.0.0` | Secrets, SCA, SAST scanning | Manual installation of multiple security tools |
 | **docker-build** | `docker-pipe:1.0.0` | Docker build + Trivy scan + push | Manual Docker commands, Trivy installation |

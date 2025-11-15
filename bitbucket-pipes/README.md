@@ -10,6 +10,7 @@ Production-ready, reusable Bitbucket Pipes for building, testing, securing, and 
 |------|---------|---------|--------|
 | [build-pipe](./CI/build-pipe/) | Build applications (Maven, Gradle, npm, Python, Go, .NET, Rust) | 1.0.0 | ✅ Ready |
 | [test-pipe](./CI/test-pipe/) | Run unit & integration tests with coverage | 1.0.0 | ✅ Ready |
+| [lint-pipe](./lint-pipe/) | Pre-commit hooks, linting, formatting, type checking | 1.0.0 | ✅ Ready |
 | [quality-pipe](./CI/quality-pipe/) | Code quality analysis (SonarQube, linting, coverage) | 1.0.0 | ✅ Ready |
 | [security-pipe](./CI/security-pipe/) | Security scanning (secrets, SCA, SAST, SBOM, IaC) | 1.0.0 | ✅ Ready |
 

@@ -45,16 +45,22 @@ definitions:
   # Reusable Step Templates
   # ==============================================================================
   steps:
-    pre-checks: &pre-checks
-      step:
-        name: 🔍 Pre-checks
-        caches: [poetry, pip, pre-commit]
-        script:
-          - pip install --upgrade pip poetry pre-commit
-          - poetry check && poetry lock --check
-          - pre-commit run --all-files || (echo "❌ Pre-commit failed" && exit 1)
-          - poetry install --no-interaction
-          - poetry run ruff check . --select=F,E --exit-non-zero-on-fix
+    # ==========================================================================
+    # Lint & Type Check (Uses lint-pipe - eliminates duplicate tool installation)
+    # ==========================================================================
+    lint-check: &lint-check
+      pipe: docker://nayaksuraj/lint-pipe:1.0.0
+      variables:
+        LANGUAGE: "python"
+        PRE_COMMIT_ENABLED: "true"
+        LOCKFILE_CHECK: "true"
+        LINT_ENABLED: "true"
+        FORMAT_CHECK_ENABLED: "true"
+        TYPE_CHECK_ENABLED: "true"
+        LINT_COMMAND: "poetry run ruff check . --select=F,E,W,I,N,UP,B,A,C,S"
+        TYPE_CHECK_COMMAND: "poetry run mypy src ${MYPY_FLAGS:---strict}"
+        FORMAT_CHECK_COMMAND: "poetry run black --check . && poetry run isort --check ."
+        FAIL_ON_ERROR: "${LINT_FAIL_ON_ERROR:-true}"
 
     unit-test: &unit-test
       step:
@@ -80,15 +86,9 @@ definitions:
           - coverage-html-${PYTHON_VERSION}/**
           - test-results-${PYTHON_VERSION}.xml
 
-    type-check: &type-check
-      step:
-        name: 🔍 Type Checking
-        caches: [poetry]
-        script:
-          - pip install --upgrade pip poetry
-          - poetry install --no-interaction
-          - poetry run mypy src ${MYPY_FLAGS:---strict}
-
+    # ==========================================================================
+    # Code Quality Analysis (Uses quality-pipe)
+    # ==========================================================================
     quality-scan: &quality-scan
       pipe: docker://nayaksuraj/quality-pipe:1.0.0
       variables:
@@ -198,7 +198,7 @@ pipelines:
   # ==============================================================================
   pull-requests:
     '**':
-      - step: *pre-checks
+      - step: *lint-check
 
       # Matrix tests for configured Python versions
       - parallel:
@@ -220,7 +220,7 @@ pipelines:
               image: python:3.12-slim
 
       - parallel:
-          - step: *type-check
+          - step: *lint-check
           - step:
               <<: *security-scan
               variables:
@@ -231,7 +231,7 @@ pipelines:
   # ==============================================================================
   branches:
     develop:
-      - step: *pre-checks
+      - step: *lint-check
 
       - parallel:
           fail-fast: true
@@ -242,7 +242,7 @@ pipelines:
             - step: {<<: *unit-test, name: "Tests 3.12", image: python:3.12-slim}
 
       - parallel:
-          - step: *type-check
+          - step: *lint-check
           - step: *quality-scan
           - step:
               <<: *security-scan
@@ -274,7 +274,7 @@ pipelines:
     # Main Branch Pipeline
     # ==============================================================================
     main:
-      - step: *pre-checks
+      - step: *lint-check
 
       - parallel:
           fail-fast: true
@@ -286,7 +286,7 @@ pipelines:
 
       - parallel:
           - step:
-              <<: *type-check
+              <<: *lint-check
               variables:
                 MYPY_FLAGS: "--strict --disallow-untyped-calls"
           - step:
@@ -339,7 +339,7 @@ pipelines:
   # ==============================================================================
   tags:
     'v*':
-      - step: *pre-checks
+      - step: *lint-check
 
       - parallel:
           fail-fast: true
@@ -351,7 +351,7 @@ pipelines:
 
       - parallel:
           - step:
-              <<: *type-check
+              <<: *lint-check
               variables:
                 MYPY_FLAGS: "--strict --disallow-untyped-calls --disallow-untyped-defs"
           - step:
