@@ -13,6 +13,95 @@ Battle-tested CI/CD pipeline for Ruby and Rails projects, based on best practice
 ✅ **Docker Multi-stage** - Optimized Ruby images
 ✅ **Kubernetes Deployment** - Helm charts with rollback
 
+## Pipeline Flow Diagram
+
+```mermaid
+graph TB
+    Start([Git Commit/Push]) --> Branch{Branch Type?}
+
+    Branch -->|feature/*| F1[bundle install<br/>--jobs=4]
+    F1 --> F2[RuboCop Lint<br/>--parallel]
+    F2 --> F3[RSpec Tests<br/>+ SimpleCov]
+    F3 --> FEnd([End])
+
+    Branch -->|develop| D1[bundle install<br/>+ DB setup]
+    D1 --> D2{Parallel}
+    D2 --> D3[RuboCop<br/>+ Brakeman]
+    D2 --> D4[Security Scan<br/>bundle-audit]
+    D3 --> D5[Docker Build<br/>Rails Assets]
+    D4 --> D5
+    D5 --> D6[Push to Registry]
+    D6 --> D7[Deploy to Dev<br/>+ Migrations]
+    D7 --> DEnd([Auto Deployed])
+
+    Branch -->|main| M1[bundle install<br/>+ RSpec]
+    M1 --> M2{Parallel}
+    M2 --> M3[Quality<br/>RuboCop + Metrics]
+    M2 --> M4[Security<br/>Brakeman + Audit]
+    M3 --> M5[Integration Tests<br/>type:integration]
+    M4 --> M5
+    M5 --> M6[System Tests<br/>Capybara + Chrome]
+    M6 --> M7[Docker Build & Scan]
+    M7 --> M8{Manual Approval}
+    M8 -->|Approved| M9[Deploy to Staging]
+    M9 --> MEnd([Deployed to Staging])
+    M8 -->|Rejected| MReject([Deployment Cancelled])
+
+    Branch -->|v*| T1[bundle install<br/>--deployment]
+    T1 --> T2{Parallel}
+    T2 --> T3[Quality Gates]
+    T2 --> T4[Security Audit]
+    T3 --> T5[Assets Precompile<br/>RAILS_ENV=production]
+    T4 --> T5
+    T5 --> T6[Docker Build<br/>Production Bundle]
+    T6 --> T7[Tag Latest + Version]
+    T7 --> T8{Manual Approval}
+    T8 -->|Approved| T9[Deploy to Production]
+    T9 --> T10[Health Check<br/>+ Smoke Tests]
+    T10 --> TEnd([Production Live])
+    T8 -->|Rejected| TReject([Release Cancelled])
+
+    style Start fill:#90EE90
+    style DEnd fill:#87CEEB
+    style MEnd fill:#FFA500
+    style TEnd fill:#FF6347
+    style FEnd fill:#D3D3D3
+    style MReject fill:#FF0000
+    style TReject fill:#FF0000
+
+    style D2 fill:#FFE4B5
+    style M2 fill:#FFE4B5
+    style T2 fill:#FFE4B5
+    style M8 fill:#FFD700
+    style T8 fill:#FFD700
+```
+
+### Pipeline Stages Explained
+
+| Stage | Description | Duration | Failure Impact |
+|-------|-------------|----------|----------------|
+| **Build & Test** | bundle install + RSpec with coverage | ~3-5 min | ❌ Pipeline stops |
+| **Quality Check** | RuboCop (parallel) + RubyCritic | ~2-3 min | ❌ Pipeline stops |
+| **Security Scan** | Brakeman + bundle-audit | ~2-3 min | ⚠️ Warning (develop), ❌ Fail (main/tags) |
+| **Integration Tests** | RSpec integration suite | ~5-8 min | ❌ Pipeline stops |
+| **System Tests** | Capybara with headless Chrome | ~8-12 min | ❌ Pipeline stops |
+| **Docker Build** | Multi-stage Rails image | ~4-6 min | ❌ Pipeline stops |
+| **Deploy to Dev** | Auto-deploy with migrations | ~3-5 min | ⚠️ Warning only |
+| **Deploy to Staging** | Manual approval required | ~4-6 min | ❌ Rollback triggered |
+| **Deploy to Production** | Manual approval + smoke tests | ~10-15 min | ❌ Auto rollback |
+
+### Bundler Cache Benefits
+
+- **First build**: ~8-12 minutes
+- **With cache**: ~2-4 minutes (70% faster)
+- **Incremental**: ~45-90 seconds
+
+### Rails-Specific Optimizations
+
+- **Bootsnap**: ~40% faster boot time
+- **Parallel tests**: 4x speedup with 4 cores
+- **Asset caching**: Reuse precompiled assets
+
 ## Required Configuration
 
 ### 1. Gemfile

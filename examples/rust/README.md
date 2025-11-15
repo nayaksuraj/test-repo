@@ -12,6 +12,96 @@ Battle-tested CI/CD pipeline for Rust projects, based on best practices from **M
 ✅ **Minimal Images** - Alpine-based Docker images (<10MB)
 ✅ **Kubernetes Deployment** - Helm charts with rollback
 
+## Pipeline Flow Diagram
+
+```mermaid
+graph TB
+    Start([Git Commit/Push]) --> Branch{Branch Type?}
+
+    Branch -->|feature/*| F1[cargo fmt --check<br/>cargo clippy]
+    F1 --> F2[cargo build<br/>--release]
+    F2 --> F3[Security Scan<br/>cargo audit]
+    F3 --> FEnd([End])
+
+    Branch -->|develop| D1[cargo build<br/>--release --all-features]
+    D1 --> D2{Parallel}
+    D2 --> D3[Quality Check<br/>clippy + cargo-bloat]
+    D2 --> D4[Security Scan<br/>audit + Trivy]
+    D3 --> D5[Docker Build<br/>Alpine Runtime]
+    D4 --> D5
+    D5 --> D6[Image Size: <10MB]
+    D6 --> D7[Deploy to Dev]
+    D7 --> DEnd([Auto Deployed])
+
+    Branch -->|main| M1[cargo build<br/>--release --all-features]
+    M1 --> M2{Parallel}
+    M2 --> M3[Quality + Audit<br/>cargo outdated]
+    M2 --> M4[Security Scan<br/>Full Suite]
+    M3 --> M5[Integration Tests]
+    M4 --> M5
+    M5 --> M6[Cross-Compilation<br/>x86_64 + aarch64]
+    M6 --> M7[Docker Build & Scan]
+    M7 --> M8{Manual Approval}
+    M8 -->|Approved| M9[Deploy to Staging]
+    M9 --> MEnd([Deployed to Staging])
+    M8 -->|Rejected| MReject([Deployment Cancelled])
+
+    Branch -->|v*| T1[cargo build<br/>--release LTO]
+    T1 --> T2{Parallel}
+    T2 --> T3[Quality Gates]
+    T2 --> T4[Security Audit]
+    T3 --> T5[Release Build<br/>strip + optimize]
+    T4 --> T5
+    T5 --> T6[Multi-arch Docker<br/>x86_64 + ARM64]
+    T6 --> T7[Tag Latest + Version]
+    T7 --> T8{Manual Approval}
+    T8 -->|Approved| T9[Deploy to Production]
+    T9 --> T10[Health Check]
+    T10 --> TEnd([Production Live])
+    T8 -->|Rejected| TReject([Release Cancelled])
+
+    style Start fill:#90EE90
+    style DEnd fill:#87CEEB
+    style MEnd fill:#FFA500
+    style TEnd fill:#FF6347
+    style FEnd fill:#D3D3D3
+    style MReject fill:#FF0000
+    style TReject fill:#FF0000
+
+    style D2 fill:#FFE4B5
+    style M2 fill:#FFE4B5
+    style T2 fill:#FFE4B5
+    style M8 fill:#FFD700
+    style T8 fill:#FFD700
+```
+
+### Pipeline Stages Explained
+
+| Stage | Description | Duration | Failure Impact |
+|-------|-------------|----------|----------------|
+| **Build & Test** | cargo build + test with coverage | ~3-5 min | ❌ Pipeline stops |
+| **Quality Check** | clippy (deny warnings), cargo-bloat | ~2-3 min | ❌ Pipeline stops |
+| **Security Scan** | cargo-audit, Trivy for dependencies | ~2-3 min | ⚠️ Warning (develop), ❌ Fail (main/tags) |
+| **Integration Tests** | Integration test suite | ~5-8 min | ❌ Pipeline stops |
+| **Cross-Compilation** | Build for x86_64 + aarch64 Linux | ~8-12 min | ❌ Pipeline stops |
+| **Docker Build** | Multi-stage Alpine build (<10MB) | ~3-5 min | ❌ Pipeline stops |
+| **Deploy to Dev** | Auto-deploy to development | ~2-3 min | ⚠️ Warning only |
+| **Deploy to Staging** | Manual approval required | ~3-5 min | ❌ Rollback triggered |
+| **Deploy to Production** | Manual approval with health checks | ~10-15 min | ❌ Auto rollback |
+
+### Cargo Cache Benefits
+
+- **First build**: ~10-15 minutes
+- **With cache**: ~2-4 minutes (70% faster)
+- **Incremental**: ~30-60 seconds
+
+### Binary Size Optimization
+
+- **Debug build**: ~50-100MB
+- **Release build**: ~5-15MB
+- **Release + strip**: ~2-8MB
+- **Alpine container**: **<10MB total**
+
 ## Required Configuration
 
 ### 1. Cargo.toml
