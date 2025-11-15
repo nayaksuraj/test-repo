@@ -61,7 +61,35 @@ Deploy to Production (manual with extended timeout)
 
 ### How to Use Templates in Your Repository
 
-**Step 1**: Copy the template for your language from nayaksuraj/test-repo
+**Method 1: Import via !include (Recommended)**
+
+Create `bitbucket-pipelines.yml` in your repository:
+
+```yaml
+# Import Python template from nayaksuraj/test-repo
+resources:
+  repositories:
+    pipeline-templates:
+      git: git@bitbucket.org:nayaksuraj/test-repo.git
+
+!include:
+  - pipeline-templates:pipeline-templates/python-template.yml
+```
+
+Change the template path for other languages:
+- Python: `pipeline-templates/python-template.yml`
+- Java Maven: `pipeline-templates/java-maven-template.yml`
+- Java Gradle: `pipeline-templates/java-gradle-template.yml`
+- Node.js: `pipeline-templates/nodejs-template.yml`
+- Go: `pipeline-templates/golang-template.yml`
+- .NET: `pipeline-templates/dotnet-template.yml`
+- Rust: `pipeline-templates/rust-template.yml`
+- Ruby: `pipeline-templates/ruby-template.yml`
+- PHP: `pipeline-templates/php-template.yml`
+
+**Method 2: Copy Template Directly**
+
+If you prefer standalone pipelines without !include:
 
 ```bash
 # For Python projects
@@ -70,13 +98,10 @@ curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/m
 # For Java Maven projects
 curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/java-maven-template.yml
 
-# For Node.js projects
-curl -o bitbucket-pipelines.yml https://bitbucket.org/nayaksuraj/test-repo/raw/main/pipeline-templates/nodejs-template.yml
-
-# Or browse all templates: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/
+# Browse all: https://bitbucket.org/nayaksuraj/test-repo/src/main/pipeline-templates/
 ```
 
-**Step 2**: Configure required Bitbucket variables
+**Configure Required Variables**
 
 Go to: **Repository Settings → Pipelines → Repository variables**
 
@@ -86,11 +111,11 @@ Add these variables (mark secured ones):
 - `SLACK_WEBHOOK_URL` (secured)
 - `SONAR_TOKEN` (secured, optional)
 
-**Step 3**: Commit and push
+**Commit and Push**
 
 ```bash
 git add bitbucket-pipelines.yml
-git commit -m "Add CI/CD pipeline from nayaksuraj/test-repo"
+git commit -m "Add CI/CD pipeline using nayaksuraj/test-repo templates"
 git push
 ```
 
@@ -98,17 +123,17 @@ Your pipeline will run automatically!
 
 ### Exploring Examples
 
-Each example directory shows how the template is used:
+Each example directory demonstrates the `!include` import pattern:
 
 ```bash
-# View Python example
+# View Python example - shows !include usage
 cat examples/python/bitbucket-pipelines.yml
 
-# View Java Maven example
+# View Java Maven example - shows !include usage
 cat examples/java-maven/bitbucket-pipelines.yml
 ```
 
-All examples reference their source template in the header comments.
+All examples use `!include` to import templates from `pipeline-templates/`.
 
 ## Why Use These Templates?
 
