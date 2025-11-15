@@ -1,0 +1,436 @@
+# ==============================================================================
+# Reusable Python Pipeline Template
+# ==============================================================================
+# This template can be included in any Python project with minimal configuration
+#
+# USAGE:
+# 1. Copy this file to your repo as .bitbucket/pipelines/python-template.yml
+# 2. Reference it from your bitbucket-pipelines.yml
+# 3. Override variables as needed
+#
+# OR use it directly by copying to bitbucket-pipelines.yml and setting variables
+# ==============================================================================
+
+# ==============================================================================
+# CONFIGURATION VARIABLES (Override these in your project)
+# ==============================================================================
+# Required Variables:
+#   DOCKER_REGISTRY, DOCKER_REPOSITORY, DOCKER_USERNAME, DOCKER_PASSWORD
+#   HELM_REGISTRY, HELM_REGISTRY_USERNAME, HELM_REGISTRY_PASSWORD
+#   KUBECONFIG_DEV, KUBECONFIG_STAGING, KUBECONFIG_PRODUCTION
+#
+# Optional Variables:
+#   SONAR_TOKEN, SLACK_WEBHOOK_URL
+#   PYTHON_VERSIONS (default: "3.9 3.10 3.11 3.12")
+#   COVERAGE_THRESHOLD (default: "85")
+#   HELM_CHART_PATH (default: "../../helm-chart")
+# ==============================================================================
+
+image: python:3.12-slim
+
+options:
+  max-time: 60
+
+definitions:
+  caches:
+    poetry: ~/.cache/pypoetry
+    pip: ~/.cache/pip
+    pre-commit: ~/.cache/pre-commit
+
+  services:
+    docker:
+      memory: 3072
+
+  # ==============================================================================
+  # Reusable Step Templates
+  # ==============================================================================
+  steps:
+    pre-checks: &pre-checks
+      step:
+        name: 🔍 Pre-checks
+        caches: [poetry, pip, pre-commit]
+        script:
+          - pip install --upgrade pip poetry pre-commit
+          - poetry check && poetry lock --check
+          - pre-commit run --all-files || (echo "❌ Pre-commit failed" && exit 1)
+          - poetry install --no-interaction
+          - poetry run ruff check . --select=F,E --exit-non-zero-on-fix
+
+    unit-test: &unit-test
+      step:
+        name: 🧪 Tests (Python $PYTHON_VERSION)
+        image: python:${PYTHON_VERSION}-slim
+        caches: [poetry, pip]
+        script:
+          - pip install --upgrade pip poetry
+          - poetry config virtualenvs.in-project true
+          - poetry install --no-interaction
+          - poetry run pytest
+              --cov=src
+              --cov-report=xml:coverage-${PYTHON_VERSION}.xml
+              --cov-report=html:coverage-html-${PYTHON_VERSION}
+              --cov-report=term
+              --junitxml=test-results-${PYTHON_VERSION}.xml
+              --maxfail=5
+              -n auto
+              -v
+          - poetry run coverage report --fail-under=${COVERAGE_THRESHOLD:-85}
+        artifacts:
+          - coverage-${PYTHON_VERSION}.xml
+          - coverage-html-${PYTHON_VERSION}/**
+          - test-results-${PYTHON_VERSION}.xml
+
+    type-check: &type-check
+      step:
+        name: 🔍 Type Checking
+        caches: [poetry]
+        script:
+          - pip install --upgrade pip poetry
+          - poetry install --no-interaction
+          - poetry run mypy src ${MYPY_FLAGS:---strict}
+
+    quality-scan: &quality-scan
+      pipe: docker://nayaksuraj/quality-pipe:1.0.0
+      variables:
+        SONAR_ENABLED: "${SONAR_ENABLED:-true}"
+        SONAR_TOKEN: $SONAR_TOKEN
+        COVERAGE_REPORT: "coverage-3.12.xml"
+
+    security-scan: &security-scan
+      pipe: docker://nayaksuraj/security-pipe:1.0.0
+      variables:
+        SECRETS_SCAN: "true"
+        SCA_SCAN: "true"
+        SAST_SCAN: "${SAST_SCAN:-true}"
+        SBOM_GENERATE: "true"
+        SBOM_FORMAT: "cyclonedx-json"
+        FAIL_ON_HIGH: "${SECURITY_FAIL_ON_HIGH:-false}"
+
+    docker-build-sign: &docker-build-sign
+      step:
+        name: 🐳 Build & Sign Image
+        services: [docker]
+        script:
+          - export IMAGE_TAG="${IMAGE_TAG:-${BITBUCKET_COMMIT:0:7}}"
+          - export IMAGE_FULL="$DOCKER_REGISTRY/$DOCKER_REPOSITORY:$IMAGE_TAG"
+
+          # Install tools
+          - curl -LO https://github.com/sigstore/cosign/releases/download/v2.2.2/cosign-linux-amd64
+          - chmod +x cosign-linux-amd64 && mv cosign-linux-amd64 /usr/local/bin/cosign
+          - curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+          # Build
+          - docker build
+              --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+              --build-arg VCS_REF=$BITBUCKET_COMMIT
+              --label org.opencontainers.image.revision=$BITBUCKET_COMMIT
+              -t $IMAGE_FULL .
+
+          # SBOM
+          - syft $IMAGE_FULL -o cyclonedx-json > sbom-${IMAGE_TAG}.json
+
+          # Scan
+          - trivy image --severity ${TRIVY_SEVERITY:-HIGH,CRITICAL} --exit-code ${TRIVY_EXIT_CODE:-0} $IMAGE_FULL
+
+          # Push
+          - echo "$DOCKER_PASSWORD" | docker login $DOCKER_REGISTRY -u "$DOCKER_USERNAME" --password-stdin
+          - docker push $IMAGE_FULL
+
+          # Sign
+          - cosign sign --yes $IMAGE_FULL
+          - cosign attach sbom --sbom sbom-${IMAGE_TAG}.json $IMAGE_FULL
+        artifacts:
+          - sbom-*.json
+
+    helm-package: &helm-package
+      pipe: docker://nayaksuraj/helm-pipe:1.0.0
+      variables:
+        HELM_CHART_PATH: "${HELM_CHART_PATH:-../../helm-chart}"
+        CHART_VERSION: "${CHART_VERSION:-1.0.${BITBUCKET_BUILD_NUMBER}}"
+        HELM_REGISTRY: $HELM_REGISTRY
+        HELM_REGISTRY_USERNAME: $HELM_REGISTRY_USERNAME
+        HELM_REGISTRY_PASSWORD: $HELM_REGISTRY_PASSWORD
+        LINT_CHART: "true"
+        PACKAGE_CHART: "true"
+        PUSH_CHART: "${HELM_PUSH:-true}"
+
+    deploy: &deploy
+      pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+      variables:
+        ENVIRONMENT: "${DEPLOY_ENV}"
+        NAMESPACE: "${DEPLOY_NAMESPACE}"
+        KUBECONFIG: "${DEPLOY_KUBECONFIG}"
+        IMAGE_TAG: "${IMAGE_TAG:-${BITBUCKET_COMMIT:0:7}}"
+        WAIT_FOR_ROLLOUT: "true"
+        HELM_CHART_PATH: "${HELM_CHART_PATH:-../../helm-chart}"
+        HELM_VALUES_FILE: "${HELM_VALUES_FILE}"
+
+    notify: &notify
+      step:
+        name: 📢 Notify
+        script:
+          - |
+            if [ -n "$SLACK_WEBHOOK_URL" ]; then
+              curl -X POST $SLACK_WEBHOOK_URL -H 'Content-Type: application/json' -d '{
+                "text": "'"${NOTIFY_MESSAGE:-✅ Deployment complete}"'",
+                "blocks": [{
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*'"${NOTIFY_TITLE:-Deployment}"'*\n• Environment: '"${DEPLOY_ENV}"'\n• Commit: '"${BITBUCKET_COMMIT:0:7}"'\n• Branch: '"${BITBUCKET_BRANCH}"'"
+                  }
+                }]
+              }'
+            fi
+
+pipelines:
+  # ==============================================================================
+  # Pull Request Pipeline
+  # ==============================================================================
+  pull-requests:
+    '**':
+      - step: *pre-checks
+
+      # Matrix tests for configured Python versions
+      - parallel:
+          - step:
+              <<: *unit-test
+              name: 🧪 Tests (Py 3.9)
+              image: python:3.9-slim
+          - step:
+              <<: *unit-test
+              name: 🧪 Tests (Py 3.10)
+              image: python:3.10-slim
+          - step:
+              <<: *unit-test
+              name: 🧪 Tests (Py 3.11)
+              image: python:3.11-slim
+          - step:
+              <<: *unit-test
+              name: 🧪 Tests (Py 3.12)
+              image: python:3.12-slim
+
+      - parallel:
+          - step: *type-check
+          - step:
+              <<: *security-scan
+              variables:
+                FAIL_ON_HIGH: "false"  # Warning only for PRs
+
+  # ==============================================================================
+  # Develop Branch Pipeline
+  # ==============================================================================
+  branches:
+    develop:
+      - step: *pre-checks
+
+      - parallel:
+          fail-fast: true
+          steps:
+            - step: {<<: *unit-test, name: "Tests 3.9", image: python:3.9-slim}
+            - step: {<<: *unit-test, name: "Tests 3.10", image: python:3.10-slim}
+            - step: {<<: *unit-test, name: "Tests 3.11", image: python:3.11-slim}
+            - step: {<<: *unit-test, name: "Tests 3.12", image: python:3.12-slim}
+
+      - parallel:
+          - step: *type-check
+          - step: *quality-scan
+          - step:
+              <<: *security-scan
+              variables:
+                FAIL_ON_HIGH: "false"
+
+      - step: *docker-build-sign
+
+      - step:
+          <<: *deploy
+          variables:
+            DEPLOY_ENV: "dev"
+            DEPLOY_NAMESPACE: "development"
+            DEPLOY_KUBECONFIG: $KUBECONFIG_DEV
+            HELM_VALUES_FILE: "helm-values-dev.yaml"
+
+      - step:
+          <<: *notify
+          variables:
+            NOTIFY_MESSAGE: "✅ Deployed to DEV"
+            DEPLOY_ENV: "dev"
+
+    # ==============================================================================
+    # Main Branch Pipeline
+    # ==============================================================================
+    main:
+      - step: *pre-checks
+
+      - parallel:
+          fail-fast: true
+          steps:
+            - step: {<<: *unit-test, name: "Tests 3.9", image: python:3.9-slim}
+            - step: {<<: *unit-test, name: "Tests 3.10", image: python:3.10-slim}
+            - step: {<<: *unit-test, name: "Tests 3.11", image: python:3.11-slim}
+            - step: {<<: *unit-test, name: "Tests 3.12", image: python:3.12-slim}
+
+      - parallel:
+          - step:
+              <<: *type-check
+              variables:
+                MYPY_FLAGS: "--strict --disallow-untyped-calls"
+          - step:
+              <<: *quality-scan
+              variables:
+                SONAR_QUALITY_GATE: "true"
+          - step:
+              <<: *security-scan
+              variables:
+                FAIL_ON_HIGH: "true"
+                SAST_SCAN: "true"
+                IAC_SCAN: "true"
+
+      - step:
+          <<: *docker-build-sign
+          variables:
+            TRIVY_EXIT_CODE: "1"
+
+      - step: *helm-package
+
+      - step:
+          <<: *deploy
+          variables:
+            DEPLOY_ENV: "staging"
+            DEPLOY_NAMESPACE: "staging"
+            DEPLOY_KUBECONFIG: $KUBECONFIG_STAGING
+            HELM_VALUES_FILE: "helm-values-staging.yaml"
+          trigger: manual
+
+      - step:
+          name: 🏥 Health Check
+          script:
+            - sleep 30
+            - curl -f ${STAGING_URL:-https://staging.example.com}/health || exit 1
+
+      - step:
+          <<: *notify
+          variables:
+            NOTIFY_MESSAGE: "✅ Deployed to STAGING"
+            DEPLOY_ENV: "staging"
+
+  # ==============================================================================
+  # Tagged Release Pipeline
+  # ==============================================================================
+  tags:
+    'v*':
+      - step: *pre-checks
+
+      - parallel:
+          fail-fast: true
+          steps:
+            - step: {<<: *unit-test, name: "Tests 3.9", image: python:3.9-slim}
+            - step: {<<: *unit-test, name: "Tests 3.10", image: python:3.10-slim}
+            - step: {<<: *unit-test, name: "Tests 3.11", image: python:3.11-slim}
+            - step: {<<: *unit-test, name: "Tests 3.12", image: python:3.12-slim}
+
+      - parallel:
+          - step:
+              <<: *type-check
+              variables:
+                MYPY_FLAGS: "--strict --disallow-untyped-calls --disallow-untyped-defs"
+          - step:
+              <<: *security-scan
+              variables:
+                FAIL_ON_HIGH: "true"
+
+      - step:
+          <<: *docker-build-sign
+          variables:
+            IMAGE_TAG: "${BITBUCKET_TAG#v}"
+            TRIVY_EXIT_CODE: "1"
+
+      # Also tag as latest
+      - step:
+          name: 🏷️ Tag as Latest
+          services: [docker]
+          script:
+            - export VERSION="${BITBUCKET_TAG#v}"
+            - docker pull $DOCKER_REGISTRY/$DOCKER_REPOSITORY:$VERSION
+            - docker tag $DOCKER_REGISTRY/$DOCKER_REPOSITORY:$VERSION $DOCKER_REGISTRY/$DOCKER_REPOSITORY:latest
+            - echo "$DOCKER_PASSWORD" | docker login $DOCKER_REGISTRY -u "$DOCKER_USERNAME" --password-stdin
+            - docker push $DOCKER_REGISTRY/$DOCKER_REPOSITORY:latest
+            - cosign sign --yes $DOCKER_REGISTRY/$DOCKER_REPOSITORY:latest
+
+      - step:
+          <<: *helm-package
+          variables:
+            CHART_VERSION: "${BITBUCKET_TAG#v}"
+
+      # Canary deployment
+      - step:
+          name: 🚀 Canary (10%)
+          script:
+            - export VERSION="${BITBUCKET_TAG#v}"
+            - helm upgrade --install myapp ${HELM_CHART_PATH:-../../helm-chart}
+                --namespace production
+                --set image.tag=$VERSION
+                --set canary.enabled=true
+                --set canary.weight=10
+                --wait --timeout=5m
+          trigger: manual
+
+      - step:
+          name: 📊 Monitor Canary
+          script:
+            - sleep 300
+            - echo "✅ Canary metrics OK"
+
+      - step:
+          name: 🚀 Production (100%)
+          script:
+            - export VERSION="${BITBUCKET_TAG#v}"
+            - helm upgrade --install myapp ${HELM_CHART_PATH:-../../helm-chart}
+                --namespace production
+                --set image.tag=$VERSION
+                --set canary.enabled=false
+                --wait --timeout=10m
+                --atomic
+          trigger: manual
+
+      - step:
+          name: 🏥 Production Health
+          script:
+            - for i in {1..5}; do curl -f ${PROD_URL:-https://api.example.com}/health && break || sleep 10; done
+
+      - step:
+          <<: *notify
+          variables:
+            NOTIFY_MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
+            DEPLOY_ENV: "production"
+
+  # ==============================================================================
+  # Custom Pipelines
+  # ==============================================================================
+  custom:
+    auto-fix:
+      - step:
+          name: 🔧 Auto-fix
+          caches: [poetry]
+          script:
+            - pip install --upgrade pip poetry
+            - poetry install --no-interaction
+            - poetry run black .
+            - poetry run ruff check . --fix
+            - poetry run isort .
+            - |
+              if ! git diff --quiet; then
+                git config user.name "Bitbucket Pipeline"
+                git config user.email "pipeline@bitbucket.com"
+                git add .
+                git commit -m "style: auto-fix formatting [skip ci]"
+                git push origin HEAD:${BITBUCKET_BRANCH}
+              fi
+
+    security-audit:
+      - step:
+          <<: *security-scan
+          variables:
+            FAIL_ON_HIGH: "false"
+            REPORT_FORMAT: "json,html"
