@@ -199,3 +199,226 @@ strategy:
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0
+
+# ==============================================================================
+# Advanced Features (Optional)
+# ==============================================================================
+
+# Network Policy - Control pod-to-pod communication
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+    # - from:
+    #   - namespaceSelector:
+    #       matchLabels:
+    #         name: default
+    #   ports:
+    #   - protocol: TCP
+    #     port: 8080
+  egress: []
+    # - to:
+    #   - namespaceSelector: {}
+    #   ports:
+    #   - protocol: TCP
+    #     port: 5432
+
+# Init Containers - Run before main container starts
+initContainers: []
+  # - name: wait-for-db
+  #   image: busybox:1.36
+  #   command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for db; sleep 2; done;']
+
+# Sidecar Containers - Additional containers in the pod
+sidecars: []
+  # - name: log-shipper
+  #   image: fluent/fluent-bit:2.0
+  #   volumeMounts:
+  #   - name: logs
+  #     mountPath: /var/log
+
+# Lifecycle Hooks - PreStop and PostStart hooks
+lifecycle: {}
+  # preStop:
+  #   exec:
+  #     command: ["/bin/sh", "-c", "sleep 15"]
+  # postStart:
+  #   exec:
+  #     command: ["/bin/sh", "-c", "echo Hello from the postStart handler"]
+
+# Topology Spread Constraints - Better pod distribution
+topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: topology.kubernetes.io/zone
+  #   whenUnsatisfiable: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       app.kubernetes.io/name: app
+
+# PodInfo - Inject pod metadata as environment variables
+podInfo:
+  enabled: false
+
+# External Secrets - Integrate with external secret managers
+externalSecret:
+  enabled: false
+  secretStore: ""  # Name of SecretStore or ClusterSecretStore
+  secretStoreKind: SecretStore  # SecretStore or ClusterSecretStore
+  refreshInterval: 1h
+  data: []
+    # - secretKey: DATABASE_PASSWORD
+    #   remoteKey: /path/to/secret
+    #   property: password  # Optional: specific property from secret
+  dataFrom: []
+    # - key: /path/to/secrets  # Import all keys from this path
+
+# KEDA ScaledObject - Event-driven autoscaling
+keda:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers: []
+    # - type: prometheus
+    #   metadata:
+    #     serverAddress: http://prometheus:9090
+    #     metricName: http_requests_total
+    #     threshold: '100'
+    #     query: sum(rate(http_requests_total[2m]))
+  fallback: {}
+    # failureThreshold: 3
+    # replicas: 6
+  advanced: {}
+    # horizontalPodAutoscalerConfig:
+    #   behavior:
+    #     scaleDown:
+    #       stabilizationWindowSeconds: 300
+
+# Certificate - Automated TLS certificate management
+certificate:
+  enabled: false
+  secretName: ""  # Will default to <fullname>-tls if not specified
+  issuerRef: letsencrypt-prod
+  issuerKind: ClusterIssuer
+  issuerGroup: ""
+  commonName: ""
+  dnsNames: []
+    # - app.example.com
+    # - www.app.example.com
+  duration: ""  # e.g., 2160h (90 days)
+  renewBefore: ""  # e.g., 360h (15 days)
+  usages: []
+    # - digital signature
+    # - key encipherment
+
+# Helm Tests - Validate deployment
+tests:
+  enabled: true
+  image: busybox:1.36
+  healthCheck:
+    enabled: false
+    path: /health
+
+# PersistentVolumeClaim - Persistent storage
+persistence:
+  enabled: false
+  accessModes:
+    - ReadWriteOnce
+  size: 8Gi
+  storageClass: ""  # Use "-" for empty storageClassName
+  annotations: {}
+  selector: {}
+
+# PrometheusRule - Custom alerting rules
+prometheusRules:
+  enabled: false
+  interval: 30s
+  labels: {}
+  rules: []
+    # - alert: HighErrorRate
+    #   expr: rate(http_requests_total{status="500"}[5m]) > 0.05
+    #   for: 10m
+    #   labels:
+    #     severity: critical
+    #   annotations:
+    #     summary: High error rate detected
+
+# Vertical Pod Autoscaler - Automatic resource adjustment
+vpa:
+  enabled: false
+  updateMode: Auto  # Off, Initial, Recreate, Auto
+  resourcePolicy: {}
+    # containerPolicies:
+    # - containerName: app
+    #   minAllowed:
+    #     cpu: 100m
+    #     memory: 128Mi
+    #   maxAllowed:
+    #     cpu: 2000m
+    #     memory: 2Gi
+
+# Istio Service Mesh - Traffic management
+istio:
+  enabled: false
+  hosts: []
+    # - app.example.com
+  gateways: []
+    # - istio-system/default-gateway
+  http: []
+    # - match:
+    #   - uri:
+    #       prefix: /api
+    #   route:
+    #   - destination:
+    #       host: app
+    #       port:
+    #         number: 80
+  trafficPolicy: {}
+    # connectionPool:
+    #   tcp:
+    #     maxConnections: 100
+    #   http:
+    #     http1MaxPendingRequests: 50
+    #     maxRequestsPerConnection: 2
+    # outlierDetection:
+    #   consecutiveErrors: 5
+    #   interval: 30s
+    #   baseEjectionTime: 30s
+  subsets: []
+    # - name: v1
+    #   labels:
+    #     version: v1
+    # - name: v2
+    #   labels:
+    #     version: v2
+
+# CronJob - Scheduled jobs
+cronJob:
+  enabled: false
+  schedule: "0 0 * * *"  # Daily at midnight
+  concurrencyPolicy: Forbid  # Allow, Forbid, Replace
+  suspend: false
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 3
+  startingDeadlineSeconds: 200
+  activeDeadlineSeconds: 600
+  backoffLimit: 6
+  restartPolicy: OnFailure
+  command: []
+    # - /bin/sh
+    # - -c
+    # - date; echo Hello from the Kubernetes cluster
+  args: []
+  resources: {}
+  volumes: []
+  volumeMounts: []
+  podAnnotations: {}
+
+# Headless Service - Direct pod access
+headlessService:
+  enabled: false
+  annotations: {}
+  publishNotReadyAddresses: false

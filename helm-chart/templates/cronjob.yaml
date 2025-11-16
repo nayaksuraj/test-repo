@@ -1,0 +1,85 @@
+{{- if .Values.cronJob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "app.fullname" . }}-cronjob
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronJob.schedule | quote }}
+  {{- with .Values.cronJob.concurrencyPolicy }}
+  concurrencyPolicy: {{ . }}
+  {{- end }}
+  {{- with .Values.cronJob.failedJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with .Values.cronJob.successfulJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with .Values.cronJob.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ . }}
+  {{- end }}
+  suspend: {{ .Values.cronJob.suspend | default false }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+        cronjob: "true"
+    spec:
+      {{- with .Values.cronJob.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ . }}
+      {{- end }}
+      {{- with .Values.cronJob.backoffLimit }}
+      backoffLimit: {{ . }}
+      {{- end }}
+      template:
+        metadata:
+          labels:
+            {{- include "app.selectorLabels" . | nindent 12 }}
+            cronjob: "true"
+          {{- with .Values.cronJob.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "app.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          restartPolicy: {{ .Values.cronJob.restartPolicy | default "OnFailure" }}
+          containers:
+          - name: {{ .Chart.Name }}
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            image: {{ include "app.image" . }}
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            {{- if .Values.cronJob.command }}
+            command:
+              {{- toYaml .Values.cronJob.command | nindent 14 }}
+            {{- end }}
+            {{- if .Values.cronJob.args }}
+            args:
+              {{- toYaml .Values.cronJob.args | nindent 14 }}
+            {{- end }}
+            env:
+              {{- toYaml .Values.env | nindent 14 }}
+            {{- with .Values.envFrom }}
+            envFrom:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.cronJob.resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.cronJob.volumeMounts }}
+            volumeMounts:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+          {{- with .Values.cronJob.volumes }}
+          volumes:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
