@@ -4,15 +4,32 @@ A production-ready, reusable Helm chart for deploying containerized applications
 
 ## Features
 
+### Core Features
 - ✅ **Framework Agnostic**: Works with any containerized application
 - ✅ **Production Ready**: Includes health checks, resource limits, security contexts
-- ✅ **Auto-scaling**: Horizontal Pod Autoscaler (HPA) support
-- ✅ **High Availability**: Pod Disruption Budget, rolling updates
-- ✅ **Security**: Non-root user, read-only filesystem options, security contexts
-- ✅ **Monitoring**: Prometheus ServiceMonitor integration
+- ✅ **Auto-scaling**: HPA and KEDA support
+- ✅ **High Availability**: Pod Disruption Budget, rolling updates, topology spread
+- ✅ **Security**: Network policies, non-root user, security contexts
+- ✅ **Monitoring**: Prometheus ServiceMonitor, PrometheusRules
 - ✅ **Ingress**: NGINX ingress with TLS support
-- ✅ **ConfigMaps & Secrets**: Easy configuration management
+- ✅ **ConfigMaps & Secrets**: Easy configuration management + External Secrets
 - ✅ **Multi-Environment**: Separate values files for dev, staging, production
+
+### Advanced Features (v2.0+)
+- ✅ **Network Policies**: Control pod-to-pod communication
+- ✅ **Init Containers**: Pre-flight checks and setup
+- ✅ **Sidecar Containers**: Multi-container pods
+- ✅ **Lifecycle Hooks**: Graceful shutdown and startup
+- ✅ **Topology Spread Constraints**: Better pod distribution
+- ✅ **External Secrets**: AWS Secrets Manager, Vault, etc.
+- ✅ **KEDA**: Event-driven autoscaling
+- ✅ **Certificate Management**: Automated TLS with cert-manager
+- ✅ **Helm Tests**: Automated deployment validation
+- ✅ **Persistent Storage**: PVC support
+- ✅ **VPA**: Vertical Pod Autoscaler
+- ✅ **Istio**: Service mesh integration
+- ✅ **CronJobs**: Scheduled task execution
+- ✅ **Headless Service**: StatefulSet support
 
 ## Quick Start
 
@@ -232,6 +249,232 @@ podAnnotations:
   prometheus.io/scrape: "true"
   prometheus.io/port: "8080"
   prometheus.io/path: "/actuator/prometheus"
+```
+
+## Advanced Features
+
+### Network Policies
+
+Control pod-to-pod communication for enhanced security:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: backend
+      ports:
+      - protocol: TCP
+        port: 8080
+  egress:
+    - to:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 5432  # PostgreSQL
+```
+
+### Init Containers
+
+Run setup tasks before main container starts:
+
+```yaml
+initContainers:
+  - name: wait-for-db
+    image: busybox:1.36
+    command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting; sleep 2; done']
+  - name: migration
+    image: myapp:latest
+    command: ['npm', 'run', 'migrate']
+```
+
+### Sidecar Containers
+
+Add log shippers, proxies, or other supporting containers:
+
+```yaml
+sidecars:
+  - name: log-shipper
+    image: fluent/fluent-bit:2.0
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log
+```
+
+### Lifecycle Hooks
+
+Graceful shutdown and startup hooks:
+
+```yaml
+lifecycle:
+  preStop:
+    exec:
+      command: ["/bin/sh", "-c", "sleep 15"]  # Drain connections
+  postStart:
+    httpGet:
+      path: /warmup
+      port: 8080
+```
+
+### External Secrets
+
+Integrate with AWS Secrets Manager, Vault, etc:
+
+```yaml
+externalSecret:
+  enabled: true
+  secretStore: aws-secrets
+  secretStoreKind: ClusterSecretStore
+  data:
+    - secretKey: DATABASE_PASSWORD
+      remoteKey: prod/db/password
+    - secretKey: API_KEY
+      remoteKey: prod/api/key
+```
+
+### KEDA Event-Driven Autoscaling
+
+Scale based on metrics, queues, or custom events:
+
+```yaml
+keda:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 50
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        query: sum(rate(http_requests_total[2m]))
+        threshold: '100'
+```
+
+### Certificate Management
+
+Automated TLS certificates with cert-manager:
+
+```yaml
+certificate:
+  enabled: true
+  issuerRef: letsencrypt-prod
+  dnsNames:
+    - app.example.com
+    - www.app.example.com
+```
+
+### Helm Tests
+
+Validate deployments automatically:
+
+```bash
+helm test myapp
+```
+
+```yaml
+tests:
+  enabled: true
+  healthCheck:
+    enabled: true
+    path: /health
+```
+
+### Persistent Storage
+
+Add persistent volumes for stateful apps:
+
+```yaml
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: fast-ssd
+  accessModes:
+    - ReadWriteOnce
+```
+
+### Prometheus Alerting Rules
+
+Custom alerts for your application:
+
+```yaml
+prometheusRules:
+  enabled: true
+  rules:
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status="500"}[5m]) > 0.05
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: High error rate detected
+```
+
+### Vertical Pod Autoscaler
+
+Automatically adjust resource requests:
+
+```yaml
+vpa:
+  enabled: true
+  updateMode: Auto
+  resourcePolicy:
+    containerPolicies:
+    - containerName: app
+      minAllowed:
+        cpu: 100m
+        memory: 128Mi
+      maxAllowed:
+        cpu: 2000m
+        memory: 2Gi
+```
+
+### Istio Service Mesh
+
+Advanced traffic management:
+
+```yaml
+istio:
+  enabled: true
+  hosts:
+    - app.example.com
+  gateways:
+    - istio-system/default-gateway
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+```
+
+### CronJobs
+
+Run scheduled tasks:
+
+```yaml
+cronJob:
+  enabled: true
+  schedule: "0 2 * * *"  # 2 AM daily
+  command:
+    - /bin/sh
+    - -c
+    - npm run backup
+```
+
+### Topology Spread Constraints
+
+Better pod distribution across zones:
+
+```yaml
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: app
 ```
 
 ## Examples

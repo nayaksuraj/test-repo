@@ -1,0 +1,22 @@
+{{- if and .Values.tests.enabled .Values.tests.healthCheck.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "app.fullname" . }}-test-health"
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+    - name: curl
+      image: {{ .Values.tests.image | default "curlimages/curl:8.5.0" }}
+      command: ['curl']
+      args:
+        - '--fail'
+        - '--silent'
+        - '--show-error'
+        - 'http://{{ include "app.fullname" . }}:{{ .Values.service.port }}{{ .Values.tests.healthCheck.path | default "/health" }}'
+  restartPolicy: Never
+{{- end }}
