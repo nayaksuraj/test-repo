@@ -63,7 +63,7 @@ pipelines:
 
 2. **Universal Pipeline Example** - Works for ANY language without changes
 3. **Generic Helm Chart** - Reusable Kubernetes deployment chart
-4. **Complete Documentation** - [REUSABLE-PIPELINES.md](./REUSABLE-PIPELINES.md)
+4. **Complete Documentation** - [See docs/ folder](./docs/) for all guides
 
 ## 🚀 Quick Start (Works for ANY Language!)
 
@@ -114,7 +114,7 @@ pipelines:
 
 **That's it! This SAME pipeline works for Python, Java, Node.js, Go, and more!**
 
-See [REUSABLE-PIPELINES.md](./REUSABLE-PIPELINES.md) for complete guide.
+See [docs/REUSABLE-PIPELINES.md](./docs/REUSABLE-PIPELINES.md) for complete guide.
 
 ### Configure Variables (Not Code!)
 
@@ -232,7 +232,7 @@ HELM_REGISTRY_USERNAME   # Registry username
 HELM_REGISTRY_PASSWORD   # Registry password/token (use secured variables)
 ```
 
-📖 **Helm Registry Setup**: See [HELM-REGISTRY-SETUP.md](./HELM-REGISTRY-SETUP.md) for complete guide on configuring GitHub Container Registry, AWS ECR, Azure ACR, Google Artifact Registry, and Harbor.
+📖 **Helm Registry Setup**: See [docs/HELM-REGISTRY-SETUP.md](./docs/HELM-REGISTRY-SETUP.md) for complete guide on configuring GitHub Container Registry, AWS ECR, Azure ACR, Google Artifact Registry, and Harbor.
 
 ## 📊 Monitoring & Observability
 
@@ -480,15 +480,18 @@ Compared to traditional script-based pipelines:
 ## 📖 Documentation
 
 ### Core Documentation
+- **[docs/](docs/)** - Complete documentation index
+- **[docs/PIPELINE-TEMPLATES.md](docs/PIPELINE-TEMPLATES.md)** - Pipeline template usage guide
+- **[docs/PIPELINE-REUSABILITY.md](docs/PIPELINE-REUSABILITY.md)** - Reusability best practices and ROI
+- **[docs/REUSABLE-PIPELINES.md](docs/REUSABLE-PIPELINES.md)** - Deep dive on reusability philosophy and patterns
 - **[bitbucket-pipes/README.md](bitbucket-pipes/README.md)** - Detailed documentation for all 9 pipes
 - **[examples/README.md](examples/README.md)** - Production-ready pipeline examples for 9 languages
-- **[REUSABLE-PIPELINES.md](REUSABLE-PIPELINES.md)** - Deep dive on reusability philosophy, ROI, and patterns
 
 ### Operational Guides
-- **[DEPLOYMENT-ENVIRONMENTS.md](DEPLOYMENT-ENVIRONMENTS.md)** - Configure Bitbucket deployment environments, permissions, and gates
-- **[ROLLBACK-PROCEDURES.md](ROLLBACK-PROCEDURES.md)** - Emergency rollback procedures and troubleshooting
-- **[HELM-REGISTRY-SETUP.md](HELM-REGISTRY-SETUP.md)** - Setup Helm chart registries (GHCR, ECR, ACR, GAR, Harbor)
-- **[helm-chart/README.md](helm-chart/README.md)** - Helm chart documentation and customization
+- **[docs/DEPLOYMENT-ENVIRONMENTS.md](docs/DEPLOYMENT-ENVIRONMENTS.md)** - Configure Bitbucket deployment environments, permissions, and gates
+- **[docs/ROLLBACK-PROCEDURES.md](docs/ROLLBACK-PROCEDURES.md)** - Emergency rollback procedures and troubleshooting
+- **[docs/HELM-REGISTRY-SETUP.md](docs/HELM-REGISTRY-SETUP.md)** - Setup Helm chart registries (GHCR, ECR, ACR, GAR, Harbor)
+- **[helm-chart/README.md](helm-chart/README.md)** - Helm chart documentation and customization (v2.0.0)
 - **[bitbucket-pipes/notify-pipe/README.md](bitbucket-pipes/notify-pipe/README.md)** - Universal notifications (Slack, Email, Teams, Discord, Webhooks)
 
 ## 🎯 Quick Start with Examples

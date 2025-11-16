@@ -1,0 +1,322 @@
+# ==============================================================================
+# Universal Language-Agnostic Pipeline Template
+# ==============================================================================
+# This template works with ANY language - Python, Java, Node.js, Go, Rust, etc.
+# All pipes AUTO-DETECT your language and tools - NO configuration needed!
+#
+# Usage: Copy this file to your repo as bitbucket-pipelines.yml or use !include
+# ==============================================================================
+
+image: atlassian/default-image:4
+
+clone:
+  depth: 50
+  lfs: false
+
+definitions:
+  caches:
+    docker: /var/lib/docker
+    maven: ~/.m2/repository
+    gradle: ~/.gradle
+    npm: ~/.npm
+    pip: ~/.cache/pip
+    go: ~/.cache/go-build
+
+  services:
+    docker:
+      memory: 2048
+
+pipelines:
+  # ==============================================================================
+  # Pull Requests - Fast Feedback
+  # ==============================================================================
+  pull-requests:
+    '**':
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+        variables:
+          PRE_COMMIT_ENABLED: "true"
+          LOCKFILE_CHECK: "true"
+
+      - parallel:
+          - pipe: docker://nayaksuraj/test-pipe:1.0.0
+            variables:
+              COVERAGE_ENABLED: "true"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SECRETS_SCAN: "true"
+              SCA_SCAN: "true"
+              FAIL_ON_HIGH: "false"
+
+  # ==============================================================================
+  # Develop Branch - Auto-Deploy to Dev
+  # ==============================================================================
+  branches:
+    develop:
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+
+      - pipe: docker://nayaksuraj/build-pipe:1.0.0
+
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          COVERAGE_ENABLED: "true"
+
+      - parallel:
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              SONAR_ENABLED: "true"
+              SONAR_TOKEN: $SONAR_TOKEN
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              SBOM_GENERATE: "true"
+              SAST_SCAN: "true"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          SCAN_IMAGE: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          DEPLOY_NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG_DEV
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-dev.yaml"
+
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+        variables:
+          CHANNELS: "slack"
+          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+          MESSAGE: "✅ Deployed to DEV"
+          ENVIRONMENT: "dev"
+
+  # ==============================================================================
+  # Main Branch - Deploy to Staging
+  # ==============================================================================
+    main:
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+
+      - pipe: docker://nayaksuraj/build-pipe:1.0.0
+
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          COVERAGE_ENABLED: "true"
+
+      - parallel:
+          - pipe: docker://nayaksuraj/quality-pipe:1.0.0
+            variables:
+              SONAR_ENABLED: "true"
+              SONAR_TOKEN: $SONAR_TOKEN
+              QUALITY_GATE_ENABLED: "true"
+
+          - pipe: docker://nayaksuraj/security-pipe:1.0.0
+            variables:
+              FAIL_ON_HIGH: "true"
+              SAST_SCAN: "true"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          SCAN_IMAGE: "true"
+          TRIVY_EXIT_CODE: "1"
+
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+        variables:
+          HELM_CHART_PATH: "./helm-chart"
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          DEPLOY_NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG_STAGING
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-staging.yaml"
+        trigger: manual
+
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+        variables:
+          CHANNELS: "slack"
+          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+          MESSAGE: "✅ Deployed to STAGING"
+          ENVIRONMENT: "staging"
+
+  # ==============================================================================
+  # Tagged Releases - Production Deployment
+  # ==============================================================================
+  tags:
+    'v*':
+      - pipe: docker://nayaksuraj/lint-pipe:1.0.0
+
+      - pipe: docker://nayaksuraj/build-pipe:1.0.0
+
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          COVERAGE_ENABLED: "true"
+
+      - pipe: docker://nayaksuraj/security-pipe:1.0.0
+        variables:
+          FAIL_ON_HIGH: "true"
+          SAST_SCAN: "true"
+          SBOM_GENERATE: "true"
+          IAC_SCAN: "true"
+
+      - pipe: docker://nayaksuraj/docker-pipe:1.0.0
+        variables:
+          DOCKER_REGISTRY: $DOCKER_REGISTRY
+          DOCKER_REPOSITORY: $DOCKER_REPOSITORY
+          DOCKER_USERNAME: $DOCKER_USERNAME
+          DOCKER_PASSWORD: $DOCKER_PASSWORD
+          IMAGE_TAG: "${BITBUCKET_TAG#v}"
+          ALSO_TAG_AS_LATEST: "true"
+          SCAN_IMAGE: "true"
+          TRIVY_EXIT_CODE: "1"
+
+      - pipe: docker://nayaksuraj/helm-pipe:1.0.0
+        variables:
+          HELM_CHART_PATH: "./helm-chart"
+          CHART_VERSION: "${BITBUCKET_TAG#v}"
+          HELM_REGISTRY: $HELM_REGISTRY
+          HELM_REGISTRY_USERNAME: $HELM_REGISTRY_USERNAME
+          HELM_REGISTRY_PASSWORD: $HELM_REGISTRY_PASSWORD
+          LINT_CHART: "true"
+          PACKAGE_CHART: "true"
+          PUSH_CHART: "true"
+
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          DEPLOY_NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG_PRODUCTION
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-production.yaml"
+          DEPLOYMENT_STRATEGY: "canary"
+          WAIT_FOR_ROLLOUT: "true"
+          ROLLOUT_TIMEOUT: "600"
+        trigger: manual
+
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+        variables:
+          CHANNELS: "slack"
+          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+          MESSAGE: "🎉 v${BITBUCKET_TAG#v} deployed to PRODUCTION"
+          ENVIRONMENT: "production"
+          TITLE: "Production Release"
+          MENTION_CHANNEL: "channel"
+
+  # ==============================================================================
+  # Custom Pipelines - Manual Operations
+  # ==============================================================================
+  custom:
+    # Comprehensive Security Audit
+    security-audit:
+      - pipe: docker://nayaksuraj/security-pipe:1.0.0
+        variables:
+          SECRETS_SCAN: "true"
+          SCA_SCAN: "true"
+          SAST_SCAN: "true"
+          SBOM_GENERATE: "true"
+          IAC_SCAN: "true"
+          DOCKERFILE_SCAN: "true"
+          CONTAINER_SCAN: "true"
+          CONTAINER_IMAGE: "${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}:latest"
+          FAIL_ON_HIGH: "false"
+          FAIL_ON_CRITICAL: "false"
+
+    # Rollback Production
+    rollback-production:
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          DEPLOY_NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG_PRODUCTION
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-production.yaml"
+          ROLLBACK: "true"
+        trigger: manual
+
+      - pipe: docker://nayaksuraj/notify-pipe:1.0.0
+        variables:
+          CHANNELS: "slack"
+          SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+          MESSAGE: "⚠️ Production rolled back"
+          ENVIRONMENT: "production"
+          TITLE: "Production Rollback"
+          STATUS: "warning"
+
+    # Rollback Staging
+    rollback-staging:
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          DEPLOY_NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG_STAGING
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-staging.yaml"
+          ROLLBACK: "true"
+
+    # Build and Test Only
+    build-only:
+      - pipe: docker://nayaksuraj/build-pipe:1.0.0
+
+      - pipe: docker://nayaksuraj/test-pipe:1.0.0
+        variables:
+          COVERAGE_ENABLED: "true"
+
+    # Deploy to Specific Environments
+    deploy-dev:
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "dev"
+          DEPLOY_NAMESPACE: "development"
+          KUBECONFIG: $KUBECONFIG_DEV
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-dev.yaml"
+
+    deploy-staging:
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "staging"
+          DEPLOY_NAMESPACE: "staging"
+          KUBECONFIG: $KUBECONFIG_STAGING
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-staging.yaml"
+        trigger: manual
+
+    deploy-production:
+      - pipe: docker://nayaksuraj/deploy-pipe:1.0.0
+        variables:
+          ENVIRONMENT: "production"
+          DEPLOY_NAMESPACE: "production"
+          KUBECONFIG: $KUBECONFIG_PRODUCTION
+          HELM_CHART_PATH: "./helm-chart"
+          HELM_VALUES_FILE: "values-production.yaml"
+          DEPLOYMENT_STRATEGY: "canary"
+          WAIT_FOR_ROLLOUT: "true"
+        trigger: manual
+
+# ==============================================================================
+# Required Bitbucket Variables (Configure in Repository Settings)
+# ==============================================================================
+# DOCKER_REGISTRY - e.g., docker.io
+# DOCKER_REPOSITORY - e.g., myorg/myapp
+# DOCKER_USERNAME - Docker registry username
+# DOCKER_PASSWORD - Docker registry password (secured)
+# HELM_REGISTRY - e.g., oci://ghcr.io/myorg/charts
+# HELM_REGISTRY_USERNAME - Helm registry username
+# HELM_REGISTRY_PASSWORD - Helm registry password (secured)
+# KUBECONFIG_DEV - Base64 encoded kubeconfig (secured)
+# KUBECONFIG_STAGING - Base64 encoded kubeconfig (secured)
+# KUBECONFIG_PRODUCTION - Base64 encoded kubeconfig (secured)
+# SLACK_WEBHOOK_URL - Slack webhook URL (secured)
+# SONAR_TOKEN - SonarQube token (secured, optional)
+# ==============================================================================
